@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Conversation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #e5ddd5;
+      margin: 0;
+      padding: 20px;
+    }
+    .chat-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 1px 0 rgba(0,0,0,.06),0 2px 5px 0 rgba(0,0,0,.2);
+      padding: 20px;
+    }
+    .message-container {
+      display: flex;
+      flex-direction: column;
+    }
+    .message {
+      max-width: 65%;
+      margin: 8px 0;
+      padding: 10px;
+      border-radius: 7.5px;
+      position: relative;
+      word-wrap: break-word;
+    }
+    .frase-message {
+      align-self: flex-end;
+      background-color: #dcf8c6;
+      margin-left: auto;
+      margin-right: 0;
+    }
+    .respuesta-message {
+      align-self: flex-start;
+      background-color: #E5E5EA;
+    }
+
+    form {
+      display: flex;
+      margin-top: 20px;
+    }
+    input[type="text"] {
+      flex-grow: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      margin-right: 10px;
+    }
+    input[type="submit"] {
+      padding: 10px 20px;
+      background-color: #128C7E;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div class="chat-container">
+  <div class="message-container">
+    <div th:each="entry : ${historial}">
+      <div class="message frase-message" th:text="${entry.frase}"></div>
+      <div class="message respuesta-message" th:text="${entry.respuesta}"></div>
+    </div>
+  </div>
+  <form action="/conversation" method="get">
+    <input type="text" name="fraseUsuario" placeholder="Escribe un mensaje..." required/>
+    <input type="submit" value="Enviar"/>
+  </form>
+</div>
+</body>
+</html>
