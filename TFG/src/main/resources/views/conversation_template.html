@@ -2,78 +2,109 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Conversation</title>
+  <title>Recipe Search</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #e5ddd5;
+      background-color: #f0f0f0;
       margin: 0;
       padding: 20px;
     }
-    .chat-container {
-      max-width: 600px;
+    .container {
+      max-width: 800px;
       margin: 0 auto;
       background-color: #fff;
       border-radius: 10px;
       box-shadow: 0 1px 1px 0 rgba(0,0,0,.06),0 2px 5px 0 rgba(0,0,0,.2);
       padding: 20px;
     }
-    .message-container {
-      display: flex;
-      flex-direction: column;
-    }
-    .message {
-      max-width: 65%;
-      margin: 8px 0;
+    .recipe {
+      margin-bottom: 20px;
       padding: 10px;
-      border-radius: 7.5px;
-      position: relative;
-      word-wrap: break-word;
+      border: 1px solid #ddd;
+      border-radius: 5px;
     }
-    .frase-message {
-      align-self: flex-end;
-      background-color: #dcf8c6;
-      margin-left: auto;
-      margin-right: 0;
+    .recipe img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 5px;
     }
-    .respuesta-message {
-      align-self: flex-start;
-      background-color: #E5E5EA;
-    }
-
     form {
-      display: flex;
-      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      display: flex; /* Utiliza flexbox para alinear horizontalmente */
+      align-items: center; /* Alinea verticalmente en el centro */
+      margin-bottom: 10px; /* Espaciado entre grupos */
+    }
+    label {
+      width: 150px; /* Ancho fijo para las etiquetas */
+      margin-right: 10px; /* Espacio entre la etiqueta y el campo */
     }
     input[type="text"] {
-      flex-grow: 1;
+      flex-grow: 1; /* Permite que el campo de entrada ocupe el espacio restante */
       padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 20px;
-      margin-right: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      box-sizing: border-box; /* Incluye padding y borde en el ancho total */
+    }
+    input[type="number"] {
+      width: 60px; /* Ancho fijo para el campo de número */
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      box-sizing: border-box; /* Incluye padding y borde en el ancho total */
     }
     input[type="submit"] {
+      display: block;
+      width: 200px;
       padding: 10px 20px;
-      background-color: #128C7E;
+      margin: 20px auto; /* Centra el botón */
+      background-color: #4CAF50;
       color: white;
       border: none;
-      border-radius: 20px;
+      border-radius: 5px;
       cursor: pointer;
+    }
+    h1 {
+      text-align: center; /* Centra el título */
     }
   </style>
 </head>
 <body>
-<div class="chat-container">
-  <div class="message-container">
-    <div th:each="entry : ${historial}">
-      <div class="message frase-message" th:text="${entry.frase}"></div>
-      <div class="message respuesta-message" th:text="${entry.respuesta}"></div>
+<div class="container">
+  <h1>Búsqueda de Recetas</h1>
+  <form action="/conversation" method="get">
+    <div class="form-group">
+      <label for="ingredientes">Ingredientes:</label>
+      <input type="text" id="ingredientes" name="ingredientes" placeholder="Introduce los ingredientes (Separados por comas)" required/>
+    </div>
+
+    <div class="form-group">
+      <label for="numero">Nº de Recetas:</label>
+      <input type="number" id="numero" name="numero" placeholder="Número de recetas" value="5" min="1" max="10"/>
+    </div>
+
+    <input type="submit" value="Buscar Recetas"/>
+  </form>
+
+  <!-- Mostrar recetas si existen -->
+  <div th:if="${recetas != null and not #lists.isEmpty(recetas)}">
+    <div th:each="receta : ${recetas}" class="recipe">
+      <h2 th:text="${receta.title}"></h2>
+      <img th:src="${receta.image}" alt="Recipe Image"/>
     </div>
   </div>
-  <form action="/conversation" method="get">
-    <input type="text" name="fraseUsuario" placeholder="Escribe un mensaje..." required/>
-    <input type="submit" value="Enviar"/>
-  </form>
+
+  <!-- Mostrar mensaje si se realizó una búsqueda pero no se encontraron recetas -->
+  <div th:if="${recetas != null and #lists.isEmpty(recetas)}">
+    <p>No se encontraron recetas. Por favor, intenta con diferentes ingredientes.</p>
+  </div>
+
+  <!-- No mostrar nada si aún no se ha realizado ninguna búsqueda -->
+  <div th:if="${recetas == null}">
+    <!-- Este div estará vacío intencionalmente -->
+  </div>
 </div>
 </body>
 </html>
