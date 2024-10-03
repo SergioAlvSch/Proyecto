@@ -75,34 +75,30 @@
 <div class="container">
   <h1>Búsqueda de Recetas</h1>
   <form action="/conversation" method="get">
-    <div class="form-group">
-      <label for="ingredientes">Ingredientes:</label>
-      <input type="text" id="ingredientes" name="ingredientes" placeholder="Introduce los ingredientes (Separados por comas)" required/>
-    </div>
+    <label for="ingredientes">Ingredientes:</label>
+    <input type="text" id="ingredientes" name="ingredientes" placeholder="Introduce los ingredientes (Separados por comas)" required/>
 
-    <div class="form-group">
-      <label for="numero">Nº de Recetas:</label>
-      <input type="number" id="numero" name="numero" placeholder="Número de recetas" value="5" min="1" max="10"/>
-    </div>
+    <label for="numero">Nº de Recetas:</label>
+    <input type="number" id="numero" name="numero" placeholder="Número de recetas" value="5" min="1" max="10"/>
 
     <input type="submit" value="Buscar Recetas"/>
   </form>
 
-  <!-- Mostrar recetas si existen -->
   <div th:if="${recetas != null and not #lists.isEmpty(recetas)}">
     <div th:each="receta : ${recetas}" class="recipe">
       <h2 th:text="${receta.title}"></h2>
       <img th:src="${receta.image}" alt="Recipe Image"/>
+      <a th:href="@{/conversation/recipe/{id}(id=${receta.id})}">Ver detalles</a>
     </div>
   </div>
 
   <!-- Mostrar mensaje si se realizó una búsqueda pero no se encontraron recetas -->
-  <div th:if="${recetas != null and #lists.isEmpty(recetas)}">
+  <div th:if="${busquedaRealizada == true and (recetas == null or #lists.isEmpty(recetas))}">
     <p>No se encontraron recetas. Por favor, intenta con diferentes ingredientes.</p>
   </div>
 
   <!-- No mostrar nada si aún no se ha realizado ninguna búsqueda -->
-  <div th:if="${recetas == null}">
+  <div th:if="${busquedaRealizada == false}">
     <!-- Este div estará vacío intencionalmente -->
   </div>
 </div>

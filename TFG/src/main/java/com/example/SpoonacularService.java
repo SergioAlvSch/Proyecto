@@ -16,17 +16,17 @@ import java.util.Map;
 @Singleton
 public class SpoonacularService {
     private final String API_KEY = "6b914274211f42b281b0242d60afac98";
-    private final String URL = "https://api.spoonacular.com/recipes/findByIngredients";
+    private final String BASE_URL = "https://api.spoonacular.com/recipes";
     private final HttpClient client;
     private final ObjectMapper objectMapper;
 
-    public SpoonacularService(HttpClient client, ObjectMapper objectMapper){
+    public SpoonacularService(HttpClient client, ObjectMapper objectMapper) {
         this.client = client;
         this.objectMapper = objectMapper;
     }
 
     public Mono<List<Map<String, Object>>> busquedaRecetas(String ingredientes, int numero) {
-        String url = UriBuilder.of(URL)
+        String url = UriBuilder.of(BASE_URL + "/findByIngredients")
                 .queryParam("apiKey", API_KEY)
                 .queryParam("ingredients", ingredientes)
                 .queryParam("number", numero)
@@ -42,6 +42,23 @@ public class SpoonacularService {
                         return Mono.just(recetas);
                     } catch (Exception e) {
                         return Mono.error(new RuntimeException("Error al procesar la respuesta: " + e.getMessage()));
+                    }
+                });
+    }
+
+    public Mono<DetallesReceta> getDetallesReceta(Integer id) {
+        String url = UriBuilder.of(BASE_URL + "/" + id + "/information")
+                .queryParam("apiKey", API_KEY)
+                .build().toString();
+
+        return Mono.from(client.retrieve(HttpRequest.GET(url), String.class))
+                .flatMap(response -> {
+                    try {
+                        DetallesReceta detallesReceta = objectMapper.readValue(response, DetallesReceta.class);
+                        return Mono.just(detallesReceta);
+                    } catch (Exception e) {
+                        e.printStackTrace(); // Imprime la traza de la excepción para depuración
+                        return Mono.error(new RuntimeException("Error al procesar los detalles de la receta: " + e.getMessage()));
                     }
                 });
     }
