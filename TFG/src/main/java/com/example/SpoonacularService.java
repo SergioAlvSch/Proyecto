@@ -1,8 +1,10 @@
 package com.example;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.json.tree.JsonNode;
 import io.micronaut.serde.ObjectMapper;
 import jakarta.inject.Singleton;
 import io.micronaut.http.client.HttpClient;
@@ -26,26 +28,25 @@ public class SpoonacularService {
     }
 
     public Mono<List<Map<String, Object>>> busquedaRecetas(String ingredientes, int numero) {
-        String url = UriBuilder.of(BASE_URL + "/findByIngredients")
+        String url = UriBuilder.of(BASE_URL + "/complexSearch")
                 .queryParam("apiKey", API_KEY)
-                .queryParam("ingredients", ingredientes)
+                .queryParam("includeIngredients", ingredientes)
+                .queryParam("ignorePantry", true)
                 .queryParam("number", numero)
                 .build().toString();
 
         return Mono.from(client.retrieve(HttpRequest.GET(url), String.class))
                 .flatMap(response -> {
                     try {
-                        List<Map<String, Object>> recetas = objectMapper.readValue(
-                                response,
-                                Argument.listOf(Argument.mapOf(String.class, Object.class))
-                        );
+                        Map<String, Object> map = objectMapper.readValue(response, Argument.of(Map.class, String.class, Object.class));
+                        List<Map<String, Object>> recetas = (List<Map<String, Object>>) map.get("results");
                         return Mono.just(recetas);
                     } catch (Exception e) {
-                        return Mono.error(new RuntimeException("Error al procesar la respuesta: " + e.getMessage()));
+                        e.printStackTrace();
+                        return Mono.error(new RuntimeException("Error al procesar la respuesta: " + e.getMessage() + ". Respuesta: " + response, e));
                     }
                 });
     }
-
     public Mono<DetallesReceta> getDetallesReceta(Integer id) {
         String url = UriBuilder.of(BASE_URL + "/" + id + "/information")
                 .queryParam("apiKey", API_KEY)
