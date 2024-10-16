@@ -74,33 +74,33 @@
 <body>
 <div class="container">
   <h1>Búsqueda de Recetas</h1>
-  <form action="/conversation" method="get">
-    <label for="ingredientes">Ingredientes:</label>
-    <input type="text" id="ingredientes" name="ingredientes" placeholder="Introduce los ingredientes (Separados por comas)" required style="width: 50%; padding: 10px"/>
 
-    <label for="numero">Nº de Recetas:</label>
-    <input type="number" id="numero" name="numero" placeholder="Número de recetas" value="5" min="1" max="10"/>
-
-    <input type="submit" value="Buscar Recetas"/>
+  <form id="peticionForm">
+    <label for="peticion">Describe tu petición:</label>
+    <input type="text" id="peticion" name="peticion" placeholder="Ej: En mi nevera tengo tomate, pollo y queso" required style="width: 80%; padding: 10px"/>
+    <input type="submit" value="Procesar"/>
   </form>
 
-  <div th:if="${recetas != null and not #lists.isEmpty(recetas)}">
-    <div th:each="receta : ${recetas}" class="recipe">
-      <h2 th:text="${receta.title}"></h2>
-      <img th:src="${receta.image}" alt="Recipe Image"/>
-      <a th:href="@{/conversation/recipe/{id}(id=${receta.id})}">Ver detalles</a>
-    </div>
-  </div>
+  <div id="respuesta"></div>
 
-  <!-- Mostrar mensaje si se realizó una búsqueda pero no se encontraron recetas -->
-  <div th:if="${busquedaRealizada == true and (recetas == null or #lists.isEmpty(recetas))}">
-    <p>No se encontraron recetas. Por favor, intenta con diferentes ingredientes.</p>
-  </div>
-
-  <!-- No mostrar nada si aún no se ha realizado ninguna búsqueda -->
-  <div th:if="${busquedaRealizada == false}">
-    <!-- Este div estará vacío intencionalmente -->
-  </div>
+  <script>
+    document.getElementById('peticionForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var peticion = document.getElementById('peticion').value;
+      fetch('/conversation/procesar', {
+        method: 'POST',
+        body: JSON.stringify({ texto: peticion }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+              .then(response => response.text())
+              .then(data => {
+                document.getElementById('respuesta').innerText = data;
+              })
+              .catch(error => console.error('Error:', error));
+    });
+  </script>
 </div>
 </body>
 </html>
