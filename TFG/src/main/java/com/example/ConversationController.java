@@ -5,14 +5,15 @@ import io.micronaut.http.annotation.*;
 import io.micronaut.views.View;
 import jakarta.inject.Inject;
 import reactor.core.publisher.Mono;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 @Controller("/conversation")
 public class ConversationController {
+    private static final Logger log = LoggerFactory.getLogger(ConversationController.class);
 
     @Inject
     private SpoonacularService spoonacularService;
@@ -43,23 +44,26 @@ public class ConversationController {
 
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.TEXT_PLAIN)
-    public Mono<String> procesarPeticion(@Body Map<String, String> peticion) {
-        String texto = peticion.get("texto");
-        return lmStudioService.procesarTexto("Traduce estos ingredientes al inglés y genera una URL para Spoonacular: " + texto)
-                .flatMap(url -> {
-                    if (!url.startsWith("https://")) {
-                        return Mono.error(new RuntimeException("URL inválida generada por LM Studio: " + url));
-                    }
-                    return spoonacularService.realizarPeticionPersonalizada(url);
-                })
+    @Produces(MediaType.APPLICATION_JSON)
+    public Mono<Map<String, String>> procesarPeticion(@Body Map<String, String> peticion) {
+        String textoOriginal = peticion.get("texto");
+        return lmStudioService.traducirConsulta(textoOriginal)
+                .flatMap(consultaTraducida -> lmStudioService.generarURLSpoonacular(consultaTraducida))
+                .flatMap(url -> spoonacularService.realizarPeticionPersonalizada(url))
                 .flatMap(respuestaSpoonacular ->
-                        lmStudioService.procesarTexto("Resume estas recetas en español: " + respuestaSpoonacular))
-                .flatMap(resumen ->
-                        lmStudioService.procesarTexto("Genera una respuesta amigable en español con este resumen de recetas: " + resumen))
+                        lmStudioService.procesarTexto("Resume esta información de Spoonacular en español: " + respuestaSpoonacular))
+                .map(resumen -> {
+                    Map<String, String> resultado = new HashMap<>();
+                    resultado.put("peticion", textoOriginal);
+                    resultado.put("respuesta", resumen);
+                    return resultado;
+                })
                 .onErrorResume(e -> {
-                    e.printStackTrace(); // Para logging
-                    return Mono.just("Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.");
+                    log.error("Error al procesar la petición: ", e);
+                    Map<String, String> error = new HashMap<>();
+                    error.put("peticion", textoOriginal);
+                    error.put("respuesta", "Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.");
+                    return Mono.just(error);
                 });
     }
 }
