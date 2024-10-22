@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Leer Noticias</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .news-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+        }
+        button, input[type="submit"] {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+        input[type="url"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Leer Noticias</h1>
+    <button onclick="location.href='/conversation'">Ir a Recetas</button>
+    <button onclick="location.href='/'">Volver a Inicio</button>
+
+    <form id="newsForm">
+        <label for="feedUrl">URL del feed RSS:</label>
+        <input type="url" id="feedUrl" name="feedUrl" required placeholder="Ej: http://rss.cnn.com/rss/edition.rss"/>
+        <input type="submit" value="Obtener Noticias"/>
+    </form>
+
+    <div id="news-content" class="news-container"></div>
+
+    <script>
+        document.getElementById('newsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var feedUrl = document.getElementById('feedUrl').value;
+
+            document.getElementById('news-content').innerHTML = 'Cargando...';
+
+            fetch('/conversation/noticias?feedUrl=' + encodeURIComponent(feedUrl), {
+                method: 'GET'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('news-content').innerHTML = '<p>' + data.resumen + '</p>';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('news-content').innerHTML = '<p>Error al obtener las noticias.</p>';
+                });
+        });
+    </script>
+</div>
+</body>
+</html>

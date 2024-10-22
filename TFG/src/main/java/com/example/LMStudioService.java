@@ -1,5 +1,6 @@
 package com.example;
 
+import com.rometools.rome.feed.synd.SyndEntry;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.json.tree.JsonNode;
@@ -11,6 +12,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 @Singleton
@@ -76,5 +78,11 @@ public class LMStudioService {
                     log.error("Error al generar la URL: ", e);
                     return Mono.error(new RuntimeException("No se pudo generar la URL de Spoonacular"));
                 });
+    }
+    public Mono<String> procesarNoticias(List<SyndEntry> noticias){
+        String prompt = "Resume las siguientes noticias:\n\n" +
+                noticias.stream().map(entry -> entry.getTitle() + ": " + entry.getDescription().getValue())
+                        .collect(Collectors.joining("\n\n"));
+        return procesarTexto(prompt);
     }
 }

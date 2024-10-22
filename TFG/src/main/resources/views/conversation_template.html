@@ -2,104 +2,64 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Recipe Search</title>
+  <title>Búsqueda de Recetas</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f0f0f0;
       margin: 0;
       padding: 20px;
+      background-color: #f0f0f0;
     }
     .container {
       max-width: 800px;
       margin: 0 auto;
-      background-color: #fff;
-      border-radius: 10px;
-      box-shadow: 0 1px 1px 0 rgba(0,0,0,.06),0 2px 5px 0 rgba(0,0,0,.2);
+      background-color: white;
       padding: 20px;
-    }
-    .recipe {
-      margin-bottom: 20px;
-      padding: 10px;
-      border: 1px solid #ddd;
       border-radius: 5px;
-    }
-    .recipe img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 5px;
-    }
-    form {
-      margin-bottom: 20px;
-    }
-    .form-group {
-      display: flex; /* Utiliza flexbox para alinear horizontalmente */
-      align-items: center; /* Alinea verticalmente en el centro */
-      margin-bottom: 10px; /* Espaciado entre grupos */
-    }
-    label {
-      width: 150px; /* Ancho fijo para las etiquetas */
-      margin-right: 10px; /* Espacio entre la etiqueta y el campo */
-    }
-    input[type="text"] {
-      flex-grow: 1; /* Permite que el campo de entrada ocupe el espacio restante */
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      box-sizing: border-box; /* Incluye padding y borde en el ancho total */
-    }
-    input[type="number"] {
-      width: 60px; /* Ancho fijo para el campo de número */
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      box-sizing: border-box; /* Incluye padding y borde en el ancho total */
-    }
-    input[type="submit"] {
-      display: block;
-      width: 200px;
-      padding: 10px 20px;
-      margin: 20px auto; /* Centra el botón */
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    h1 {
-      text-align: center; /* Centra el título */
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
     .chat-container {
-      max-width: 800px;
-      margin: 20px auto;
+      margin-top: 20px;
       border: 1px solid #ddd;
-      border-radius: 5px;
       padding: 10px;
-      height: 400px;
+      height: 300px;
       overflow-y: auto;
     }
     .message {
       margin-bottom: 10px;
       padding: 10px;
       border-radius: 5px;
-      max-width: 70%;
     }
     .user-message {
-      background-color: #dcf8c6;
-      margin-left: auto;
+      background-color: #e6f3ff;
+      text-align: right;
     }
     .bot-message {
-      background-color: #f1f0f0;
+      background-color: #f0f0f0;
+    }
+    button, input[type="submit"] {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      box-sizing: border-box;
     }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>Búsqueda de Recetas</h1>
+  <button onclick="location.href='/noticias'">Ir a Noticias</button>
+  <button onclick="location.href='/'">Volver a Inicio</button>
 
   <form id="peticionForm">
     <label for="peticion">Describe tu petición:</label>
-    <input type="text" id="peticion" name="peticion" placeholder="Ej: En mi nevera tengo tomate, pollo y queso" required style="width: 80%; padding: 10px"/>
+    <input type="text" id="peticion" name="peticion" placeholder="Ej: En mi nevera tengo tomate, pollo y queso" required/>
     <input type="submit" value="Procesar"/>
   </form>
 
@@ -110,7 +70,6 @@
       e.preventDefault();
       var peticion = document.getElementById('peticion').value;
 
-      // Agregar mensaje del usuario
       addMessage(peticion, 'user-message');
 
       fetch('/conversation/procesar', {
@@ -122,7 +81,6 @@
       })
               .then(response => response.json())
               .then(data => {
-                // Agregar respuesta del bot
                 addMessage(data.respuesta, 'bot-message');
               })
               .catch(error => {
@@ -130,7 +88,7 @@
                 addMessage('Lo siento, hubo un error al procesar tu solicitud.', 'bot-message');
               });
 
-      document.getElementById('peticion').value = ''; // Limpiar el campo de entrada
+      document.getElementById('peticion').value = '';
     });
 
     function addMessage(message, className) {
@@ -139,7 +97,7 @@
       messageElement.className = 'message ' + className;
       messageElement.textContent = message;
       chatContainer.appendChild(messageElement);
-      chatContainer.scrollTop = chatContainer.scrollHeight; // Scroll al final
+      chatContainer.scrollTop = chatContainer.scrollHeight;
     }
   </script>
 </div>
