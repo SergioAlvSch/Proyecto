@@ -12,8 +12,8 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 import java.util.stream.Collectors;
-
 
 @Singleton
 public class LMStudioService {
@@ -51,37 +51,46 @@ public class LMStudioService {
 
     public Mono<String> traducirConsulta(String consulta) {
         String prompt = "Traduce la siguiente consulta al inglés, manteniendo el significado y la intención original: '" + consulta + "'. Responde SOLO con la traducción, sin texto adicional.";
-
-        return procesarTexto(prompt)
-                .map(String::trim)
-                .onErrorResume(e -> {
-                    log.error("Error al traducir la consulta: ", e);
-                    return Mono.error(new RuntimeException("No se pudo traducir la consulta"));
-                });
+        return procesarTexto(prompt).map(String::trim);
     }
 
-    public Mono<String> generarURLSpoonacular(String consultaTraducida) {
-        String prompt = "Genera una URL para la API de Spoonacular basada en esta consulta en inglés: '" + consultaTraducida + "'. Sigue estas instrucciones:\n" +
-                "1. URL base: https://api.spoonacular.com/\n" +
-                "2. Si la consulta es sobre buscar recetas por ingredientes, usa 'recipes/complexSearch' y el parámetro 'includeIngredients'.\n" +
-                "3. Si la consulta es sobre obtener información de una receta específica, usa 'recipes/{id}/information'.\n" +
-                "4. Para otras consultas, elige el endpoint más apropiado de la documentación de Spoonacular.\n" +
-                "5. Siempre incluye: apiKey=6b914274211f42b281b0242d60afac98\n" +
-                "6. Codifica los parámetros correctamente para URL.\n" +
-                "Responde SOLO con la URL completa generada.";
-
-        return procesarTexto(prompt)
-                .map(String::trim)
-                .filter(url -> url.startsWith("https://api.spoonacular.com/"))
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("URL generada inválida")))
-                .onErrorResume(e -> {
-                    log.error("Error al generar la URL: ", e);
-                    return Mono.error(new RuntimeException("No se pudo generar la URL de Spoonacular"));
-                });
+    public Mono<String> identificarTipoConsulta(String consultaTraducida) {
+        String prompt = "Determina si la siguiente consulta se trata de buscar múltiples recetas por ingredientes, obtener detalles de una receta específica, o cómo preparar una receta específica: '" + consultaTraducida + "'. Responde SOLO con 'ingredientes', 'detalles_receta', o 'preparacion_receta'.";
+        return procesarTexto(prompt).map(String::trim);
     }
-    public Mono<String> procesarNoticias(List<SyndEntry> noticias){
-        String prompt = "Resume las siguientes noticias:\n\n" +
-                noticias.stream().map(entry -> entry.getTitle() + ": " + entry.getDescription().getValue())
+
+    public Mono<List<String>> extraerIngredientes(String consultaTraducida) {
+        String prompt = "Extrae los ingredientes mencionados en la siguiente consulta: '" + consultaTraducida + "'. Responde con una lista de ingredientes separados por comas.";
+        return procesarTexto(prompt)
+                .map(respuesta -> Arrays.asList(respuesta.split(",")))
+                .map(ingredientes -> ingredientes.stream().map(String::trim).collect(Collectors.toList()));
+    }
+
+    public Mono<String> extraerNombreReceta(String consultaTraducida) {
+        String prompt = "Extrae el nombre de la receta mencionada en la siguiente consulta: '" + consultaTraducida + "'. Responde SOLO con el nombre de la receta.";
+        return procesarTexto(prompt).map(String::trim);
+    }
+
+    public Mono<String> generarRespuestaRecetas(String tipo, String respuestaSpoonacular) {
+        String prompt;
+        if ("ingredientes".equals(tipo)) {
+            prompt = "Genera una respuesta amigable en inglés para esta lista de recetas basadas en ingredientes: " + respuestaSpoonacular;
+        } else if ("detalles_receta".equals(tipo)) {
+            prompt = "Genera una respuesta amigable en inglés con los detalles de esta receta específica: " + respuestaSpoonacular;
+        } else {
+            prompt = "Genera una respuesta amigable en inglés explicando cómo preparar esta receta: " + respuestaSpoonacular;
+        }
+        return procesarTexto(prompt);
+    }
+
+    public Mono<String> traducirRespuesta(String respuestaEnIngles) {
+        String prompt = "Traduce la siguiente respuesta al español, manteniendo un tono amigable y conversacional: '" + respuestaEnIngles + "'";
+        return procesarTexto(prompt);
+    }
+
+    public Mono<String> procesarNoticias(List<SyndEntry> noticias) {
+        String prompt = "Summarize the following 5 most recent news in English, leaving a line break between news:\n\n" +
+                noticias.stream().limit(5).map(entry -> entry.getTitle() + ": " + entry.getDescription().getValue())
                         .collect(Collectors.joining("\n\n"));
         return procesarTexto(prompt);
     }

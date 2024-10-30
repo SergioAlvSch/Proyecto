@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.AbstractMap.SimpleEntry;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @Controller("/")
 public class ConversationController {
@@ -48,10 +51,39 @@ public class ConversationController {
     public Mono<Map<String, String>> procesarPeticion(@Body Map<String, String> peticion) {
         String textoOriginal = peticion.get("texto");
         return lmStudioService.traducirConsulta(textoOriginal)
-                .flatMap(consultaTraducida -> lmStudioService.generarURLSpoonacular(consultaTraducida))
-                .flatMap(url -> spoonacularService.realizarPeticionPersonalizada(url))
-                .flatMap(respuestaSpoonacular ->
-                        lmStudioService.procesarTexto("Resume esta información de Spoonacular en español: " + respuestaSpoonacular))
+                .flatMap(consultaTraducida ->
+                        lmStudioService.identificarTipoConsulta(consultaTraducida)
+                                .flatMap(tipo -> {
+                                    if ("ingredientes".equals(tipo)) {
+                                        return lmStudioService.extraerIngredientes(consultaTraducida)
+                                                .map(ingredientes -> new SimpleEntry<>(tipo, String.join(",", ingredientes)));
+                                    } else {
+                                        return lmStudioService.extraerNombreReceta(consultaTraducida)
+                                                .map(nombreReceta -> new SimpleEntry<>(tipo, nombreReceta));
+                                    }
+                                })
+                )
+                .flatMap(entry -> {
+                    String tipo = entry.getKey();
+                    String parametros = entry.getValue();
+                    String baseUrl = "https://api.spoonacular.com/recipes/complexSearch";
+                    String apiKey = "6b914274211f42b281b0242d60afac98";
+                    String encodedParams = URLEncoder.encode(parametros, StandardCharsets.UTF_8);
+                    String url;
+                    if ("ingredientes".equals(tipo)) {
+                        url = baseUrl + "?includeIngredients=" + encodedParams + "&apiKey=" + apiKey;
+                    } else if ("detalles_receta".equals(tipo) || "preparacion_receta".equals(tipo)) {
+                        url = "https://api.spoonacular.com/recipes/" + encodedParams + "/information?apiKey=" + apiKey;
+                    } else {
+                        url = baseUrl + "?query=" + encodedParams + "&apiKey=" + apiKey;
+                    }
+                    return spoonacularService.realizarPeticionPersonalizada(url)
+                            .map(respuesta -> new SimpleEntry<>(tipo, respuesta));
+                })
+                .flatMap(entry ->
+                        lmStudioService.generarRespuestaRecetas(entry.getKey(), entry.getValue())
+                                .flatMap(lmStudioService::traducirRespuesta)
+                )
                 .map(resumen -> {
                     Map<String, String> resultado = new HashMap<>();
                     resultado.put("peticion", textoOriginal);
@@ -72,6 +104,7 @@ public class ConversationController {
     public Mono<Map<String, String>> obtenerNoticias(@QueryValue String feedUrl) {
         return rssReaderService.readRssFeed(feedUrl)
                 .flatMap(noticias -> lmStudioService.procesarNoticias(noticias))
+                .flatMap(lmStudioService::traducirRespuesta)
                 .map(resumen -> {
                     Map<String, String> resultado = new HashMap<>();
                     resultado.put("resumen", resumen);
