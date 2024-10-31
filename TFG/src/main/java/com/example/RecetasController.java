@@ -14,9 +14,9 @@ import java.util.AbstractMap.SimpleEntry;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-@Controller("/")
-public class ConversationController {
-    private static final Logger log = LoggerFactory.getLogger(ConversationController.class);
+@Controller("/recetas")
+public class RecetasController {
+    private static final Logger log = LoggerFactory.getLogger(RecetasController.class);
 
     @Inject
     private SpoonacularService spoonacularService;
@@ -24,31 +24,16 @@ public class ConversationController {
     @Inject
     private LMStudioService lmStudioService;
 
-    @Inject
-    private RssReaderService rssReaderService;
-
-    @Get
-    @View("principal")
-    public Map<String, Object> principal() {
+    @Get("/")
+    @View("recetas_template")
+    public Map<String, Object> getRecetas() {
         return new HashMap<>();
     }
 
-    @Get("/conversation")
-    @View("conversation_template")
-    public Map<String, Object> getConversation() {
-        return new HashMap<>();
-    }
-
-    @Get("/noticias")
-    @View("noticias_template")
-    public Map<String, Object> getNoticias() {
-        return new HashMap<>();
-    }
-
-    @Post("/conversation/procesar")
+    @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Mono<Map<String, String>> procesarPeticion(@Body Map<String, String> peticion) {
+    public Mono<Map<String, String>> procesarPeticionReceta(@Body Map<String, String> peticion) {
         String textoOriginal = peticion.get("texto");
         return lmStudioService.traducirConsulta(textoOriginal)
                 .flatMap(consultaTraducida ->
@@ -68,14 +53,11 @@ public class ConversationController {
                     String parametros = entry.getValue();
                     String baseUrl = "https://api.spoonacular.com/recipes/complexSearch";
                     String apiKey = "6b914274211f42b281b0242d60afac98";
-                    String encodedParams = URLEncoder.encode(parametros, StandardCharsets.UTF_8);
                     String url;
                     if ("ingredientes".equals(tipo)) {
-                        url = baseUrl + "?includeIngredients=" + encodedParams + "&apiKey=" + apiKey;
-                    } else if ("detalles_receta".equals(tipo) || "preparacion_receta".equals(tipo)) {
-                        url = "https://api.spoonacular.com/recipes/" + encodedParams + "/information?apiKey=" + apiKey;
+                        url = baseUrl + "?includeIngredients=" + URLEncoder.encode(parametros, StandardCharsets.UTF_8) + "&apiKey=" + apiKey;
                     } else {
-                        url = baseUrl + "?query=" + encodedParams + "&apiKey=" + apiKey;
+                        url = baseUrl + "?query=" + URLEncoder.encode(parametros, StandardCharsets.UTF_8) + "&apiKey=" + apiKey;
                     }
                     return spoonacularService.realizarPeticionPersonalizada(url)
                             .map(respuesta -> new SimpleEntry<>(tipo, respuesta));
@@ -95,25 +77,6 @@ public class ConversationController {
                     Map<String, String> error = new HashMap<>();
                     error.put("peticion", textoOriginal);
                     error.put("respuesta", "Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.");
-                    return Mono.just(error);
-                });
-    }
-
-    @Get("/conversation/noticias")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Mono<Map<String, String>> obtenerNoticias(@QueryValue String feedUrl) {
-        return rssReaderService.readRssFeed(feedUrl)
-                .flatMap(noticias -> lmStudioService.procesarNoticias(noticias))
-                .flatMap(lmStudioService::traducirRespuesta)
-                .map(resumen -> {
-                    Map<String, String> resultado = new HashMap<>();
-                    resultado.put("resumen", resumen);
-                    return resultado;
-                })
-                .onErrorResume(e -> {
-                    log.error("Error al obtener noticias: ", e);
-                    Map<String, String> error = new HashMap<>();
-                    error.put("resumen", "Lo siento, hubo un error al obtener las noticias: " + e.getMessage());
                     return Mono.just(error);
                 });
     }

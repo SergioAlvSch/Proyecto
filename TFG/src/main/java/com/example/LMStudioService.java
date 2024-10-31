@@ -1,6 +1,7 @@
 package com.example;
 
 import com.rometools.rome.feed.synd.SyndEntry;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.json.tree.JsonNode;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 @Singleton
 public class LMStudioService {
@@ -92,6 +94,29 @@ public class LMStudioService {
         String prompt = "Summarize the following 5 most recent news in English, leaving a line break between news:\n\n" +
                 noticias.stream().limit(5).map(entry -> entry.getTitle() + ": " + entry.getDescription().getValue())
                         .collect(Collectors.joining("\n\n"));
+        return procesarTexto(prompt);
+    }
+
+    public Mono<Map<String, String>> extraerInformacionViaje(String consulta) {
+        String prompt = "Extrae la siguiente información de la consulta: '" + consulta + "'. " +
+                "1. Ciudad o país de destino. " +
+                "2. Número de días hasta el viaje. " +
+                "3. Duración del viaje en días. " +
+                "Responde en formato JSON con los campos: destino, diasHastaViaje, duracionViaje.";
+        return procesarTexto(prompt)
+                .map(respuesta -> {
+                    try {
+                        return objectMapper.readValue(respuesta, Argument.mapOf(String.class, String.class));
+                    } catch (Exception e) {
+                        throw new RuntimeException("Error al procesar la respuesta JSON", e);
+                    }
+                });
+    }
+
+    public Mono<String> generarConsejoRopa(String informacionMeteorologica) {
+        String prompt = "Basándote en esta información meteorológica: '" + informacionMeteorologica + "', " +
+                "aconseja qué ropa llevar al viaje. Ten en cuenta la temperatura, precipitaciones y condiciones generales. " +
+                "Da una respuesta amigable y detallada.";
         return procesarTexto(prompt);
     }
 }

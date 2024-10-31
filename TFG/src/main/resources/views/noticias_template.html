@@ -42,34 +42,31 @@
 <body>
 <div class="container">
     <h1>Leer Noticias</h1>
-    <button onclick="location.href='/conversation'">Ir a Recetas</button>
+    <button onclick="location.href='/recetas'">Ir a Recetas</button>
+    <button onclick="location.href='/tiempo'">Ir a Tiempo</button>
     <button onclick="location.href='/'">Volver a Inicio</button>
 
-    <form id="newsForm">
+    <form id="noticiasForm">
         <label for="feedUrl">URL del feed RSS:</label>
-        <input type="url" id="feedUrl" name="feedUrl" required placeholder="Ej: http://rss.cnn.com/rss/edition.rss"/>
+        <input type="url" id="feedUrl" name="feedUrl" placeholder="https://ejemplo.com/rss" required/>
         <input type="submit" value="Obtener Noticias"/>
     </form>
 
-    <div id="news-content" class="news-container"></div>
+    <div id="news-container" class="news-container"></div>
 
     <script>
-        document.getElementById('newsForm').addEventListener('submit', function(e) {
+        document.getElementById('noticiasForm').addEventListener('submit', function(e) {
             e.preventDefault();
             var feedUrl = document.getElementById('feedUrl').value;
 
-            document.getElementById('news-content').innerHTML = 'Cargando...';
-
-            fetch('/conversation/noticias?feedUrl=' + encodeURIComponent(feedUrl), {
-                method: 'GET'
-            })
+            fetch('/noticias/procesar?feedUrl=' + encodeURIComponent(feedUrl))
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('news-content').innerHTML = '<p>' + data.resumen + '</p>';
+                    document.getElementById('news-container').innerHTML = data.resumen;
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    document.getElementById('news-content').innerHTML = '<p>Error al obtener las noticias.</p>';
+                    document.getElementById('news-container').innerHTML = 'Lo siento, hubo un error al obtener las noticias.';
                 });
         });
     </script>

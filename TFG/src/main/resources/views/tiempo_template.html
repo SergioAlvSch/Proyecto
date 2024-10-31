@@ -2,7 +2,7 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Búsqueda de Recetas</title>
+  <title>Consulta de Tiempo</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -53,28 +53,29 @@
 </head>
 <body>
 <div class="container">
-  <h1>Búsqueda de Recetas</h1>
+  <h1>Consulta de Tiempo</h1>
+  <button onclick="location.href='/recetas'">Ir a Recetas</button>
   <button onclick="location.href='/noticias'">Ir a Noticias</button>
   <button onclick="location.href='/'">Volver a Inicio</button>
 
-  <form id="peticionForm">
-    <label for="peticion">Describe tu petición:</label>
-    <input type="text" id="peticion" name="peticion" placeholder="Ej: En mi nevera tengo tomate, pollo y queso" required/>
-    <input type="submit" value="Procesar"/>
+  <form id="tiempoForm">
+    <label for="consulta">Describe tu viaje:</label>
+    <input type="text" id="consulta" name="consulta" placeholder="Ej: En tres días me voy una semana a París" required/>
+    <input type="submit" value="Consultar Tiempo"/>
   </form>
 
   <div id="chat-container" class="chat-container"></div>
 
   <script>
-    document.getElementById('peticionForm').addEventListener('submit', function(e) {
+    document.getElementById('tiempoForm').addEventListener('submit', function(e) {
       e.preventDefault();
-      var peticion = document.getElementById('peticion').value;
+      var consulta = document.getElementById('consulta').value;
 
-      addMessage(peticion, 'user-message');
+      addMessage(consulta, 'user-message');
 
-      fetch('/conversation/procesar', {
+      fetch('/tiempo/procesar', {
         method: 'POST',
-        body: JSON.stringify({ texto: peticion }),
+        body: JSON.stringify({ texto: consulta }),
         headers: {
           'Content-Type': 'application/json'
         }
@@ -88,7 +89,7 @@
                 addMessage('Lo siento, hubo un error al procesar tu solicitud.', 'bot-message');
               });
 
-      document.getElementById('peticion').value = '';
+      document.getElementById('consulta').value = '';
     });
 
     function addMessage(message, className) {
