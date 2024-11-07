@@ -64,7 +64,7 @@ public class TiempoController {
                     log.error("Error al procesar la consulta de tiempo: ", e);
                     Map<String, String> error = new HashMap<>();
                     error.put("peticion", textoOriginal);
-                    error.put("respuesta", "Lo siento, hubo un error al procesar tu consulta de tiempo. Por favor, intenta de nuevo.");
+                    error.put("respuesta", "Lo siento, hubo un error al procesar tu consulta de tiempo: " + e.getMessage());
                     return Mono.just(error);
                 });
     }

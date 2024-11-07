@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.AbstractMap.SimpleEntry;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 @Controller("/recetas")
 public class RecetasController {
@@ -38,13 +40,21 @@ public class RecetasController {
         return lmStudioService.traducirConsulta(textoOriginal)
                 .flatMap(consultaTraducida ->
                         lmStudioService.identificarTipoConsulta(consultaTraducida)
-                                .flatMap(tipo -> {
-                                    if ("ingredientes".equals(tipo)) {
-                                        return lmStudioService.extraerIngredientes(consultaTraducida)
-                                                .map(ingredientes -> new SimpleEntry<>(tipo, String.join(",", ingredientes)));
-                                    } else {
-                                        return lmStudioService.extraerNombreReceta(consultaTraducida)
-                                                .map(nombreReceta -> new SimpleEntry<>(tipo, nombreReceta));
+                                .flatMap(tipoRespuesta -> {
+                                    String tipo = extraerTipoConsulta(tipoRespuesta);
+                                    if (tipo == null) {
+                                        log.warn("Tipo de consulta no reconocido: {}", tipoRespuesta);
+                                        return Mono.error(new IllegalArgumentException("Tipo de consulta no reconocido"));
+                                    }
+                                    switch (tipo) {
+                                        case "1":
+                                            return lmStudioService.extraerIngredientes(consultaTraducida)
+                                                    .map(ingredientes -> new SimpleEntry<>("ingredientes", String.join(",", ingredientes)));
+                                        case "2":
+                                            return lmStudioService.extraerNombreReceta(consultaTraducida)
+                                                    .map(nombreReceta -> new SimpleEntry<>("receta_especifica", nombreReceta));
+                                        default:
+                                            return Mono.error(new IllegalArgumentException("Tipo de consulta no reconocido"));
                                     }
                                 })
                 )
@@ -76,8 +86,17 @@ public class RecetasController {
                     log.error("Error al procesar la petición: ", e);
                     Map<String, String> error = new HashMap<>();
                     error.put("peticion", textoOriginal);
-                    error.put("respuesta", "Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.");
+                    error.put("respuesta", "Lo siento, hubo un error al procesar tu solicitud: " + e.getMessage());
                     return Mono.just(error);
                 });
+    }
+
+    private String extraerTipoConsulta(String respuesta) {
+        Pattern pattern = Pattern.compile("\\b[12]\\b");
+        Matcher matcher = pattern.matcher(respuesta);
+        if (matcher.find()) {
+            return matcher.group();
+        }
+        return null;
     }
 }

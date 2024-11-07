@@ -1,29 +1,55 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Consulta de Tiempo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asistente del Tiempo</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: #f0f0f0;
-    }
-    .container {
       max-width: 800px;
       margin: 0 auto;
-      background-color: white;
       padding: 20px;
-      border-radius: 5px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    .chat-container {
-      margin-top: 20px;
-      border: 1px solid #ddd;
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .nav-buttons {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .nav-button {
+      padding: 10px 20px;
+      background-color: #e6f3ff;
+      color: #333;
+      border: none;
+      cursor: pointer;
+      margin: 0 5px;
+      border-radius: 5px;
+    }
+    .nav-button:hover {
+      background-color: #d1e8ff;
+    }
+    #peticionForm {
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    #peticion {
+      width: calc(100% - 22px);
       padding: 10px;
-      height: 300px;
+      margin-bottom: 10px;
+    }
+    #chat-container {
+      border: 1px solid #ddd;
+      padding: 20px;
+      height: 400px;
       overflow-y: auto;
+      width: calc(100% - 42px);
     }
     .message {
       margin-bottom: 10px;
@@ -37,70 +63,84 @@
     .bot-message {
       background-color: #f0f0f0;
     }
-    button, input[type="submit"] {
+    .submit-button {
       padding: 10px 20px;
-      font-size: 16px;
-      margin: 10px 0;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
       cursor: pointer;
-    }
-    input[type="text"] {
       width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      box-sizing: border-box;
+    }
+    .submit-button:hover {
+      background-color: #45a049;
     }
   </style>
 </head>
 <body>
-<div class="container">
-  <h1>Consulta de Tiempo</h1>
-  <button onclick="location.href='/recetas'">Ir a Recetas</button>
-  <button onclick="location.href='/noticias'">Ir a Noticias</button>
-  <button onclick="location.href='/'">Volver a Inicio</button>
-
-  <form id="tiempoForm">
-    <label for="consulta">Describe tu viaje:</label>
-    <input type="text" id="consulta" name="consulta" placeholder="Ej: En tres días me voy una semana a París" required/>
-    <input type="submit" value="Consultar Tiempo"/>
-  </form>
-
-  <div id="chat-container" class="chat-container"></div>
-
-  <script>
-    document.getElementById('tiempoForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      var consulta = document.getElementById('consulta').value;
-
-      addMessage(consulta, 'user-message');
-
-      fetch('/tiempo/procesar', {
-        method: 'POST',
-        body: JSON.stringify({ texto: consulta }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-              .then(response => response.json())
-              .then(data => {
-                addMessage(data.respuesta, 'bot-message');
-              })
-              .catch(error => {
-                console.error('Error:', error);
-                addMessage('Lo siento, hubo un error al procesar tu solicitud.', 'bot-message');
-              });
-
-      document.getElementById('consulta').value = '';
-    });
-
-    function addMessage(message, className) {
-      var chatContainer = document.getElementById('chat-container');
-      var messageElement = document.createElement('div');
-      messageElement.className = 'message ' + className;
-      messageElement.textContent = message;
-      chatContainer.appendChild(messageElement);
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
-  </script>
+<h1>Asistente del Tiempo</h1>
+<div class="nav-buttons">
+  <button class="nav-button" onclick="window.location.href='/'">Menú Principal</button>
+  <button class="nav-button" onclick="window.location.href='/recetas'">Recetas</button>
+  <button class="nav-button" onclick="window.location.href='/noticias'">Noticias</button>
 </div>
-</body>
-</html>
+<form id="peticionForm">
+  <input type="text" id="peticion" placeholder="Escribe tu pregunta aquí" required>
+  <button type="submit" class="submit-button">Enviar</button>
+</form>
+<div id="chat-container"></div>
+
+<script>
+  document.getElementById('peticionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var peticion = document.getElementById('peticion').value;
+
+    addMessage(peticion, 'user-message');
+
+    // Mostrar mensaje de carga
+    var loadingMessageId = addMessage('Procesando tu solicitud...', 'bot-message');
+
+    fetch('/tiempo/procesar', {
+      method: 'POST',
+      body: JSON.stringify({ texto: peticion }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
+              }
+              return response.json();
+            })
+            .then(data => {
+              // Eliminar el mensaje de carga
+              removeMessage(loadingMessageId);
+              addMessage(data.respuesta, 'bot-message');
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              // Eliminar el mensaje de carga
+              removeMessage(loadingMessageId);
+              addMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.', 'bot-message');
+            });
+
+    document.getElementById('peticion').value = '';
+  });
+
+  function addMessage(message, className) {
+    var chatContainer = document.getElementById('chat-container');
+    var messageElement = document.createElement('div');
+    messageElement.className = 'message ' + className;
+    messageElement.textContent = message;
+    chatContainer.appendChild(messageElement);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return messageElement.id = 'msg-' + Date.now(); // Retorna un ID único para el mensaje
+  }
+
+  function removeMessage(messageId) {
+    var messageElement = document.getElementById(messageId);
+    if (messageElement) {
+      messageElement.remove();
+    }
+  }
+</script>

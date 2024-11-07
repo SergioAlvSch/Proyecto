@@ -27,21 +27,23 @@ public class NoticiasController {
         return new HashMap<>();
     }
 
-    @Get("/procesar")
+    @Post("/procesar")
+    @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Mono<Map<String, String>> obtenerNoticias(@QueryValue String feedUrl) {
+    public Mono<Map<String, String>> obtenerNoticias(@Body Map<String, String> peticion) {
+        String feedUrl = peticion.get("texto");
         return rssReaderService.readRssFeed(feedUrl)
                 .flatMap(noticias -> lmStudioService.procesarNoticias(noticias))
                 .flatMap(lmStudioService::traducirRespuesta)
                 .map(resumen -> {
                     Map<String, String> resultado = new HashMap<>();
-                    resultado.put("resumen", resumen);
+                    resultado.put("respuesta", resumen);
                     return resultado;
                 })
                 .onErrorResume(e -> {
                     log.error("Error al obtener noticias: ", e);
                     Map<String, String> error = new HashMap<>();
-                    error.put("resumen", "Lo siento, hubo un error al obtener las noticias: " + e.getMessage());
+                    error.put("respuesta", "Lo siento, hubo un error al obtener las noticias: " + e.getMessage());
                     return Mono.just(error);
                 });
     }

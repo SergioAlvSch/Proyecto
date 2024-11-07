@@ -11,9 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Arrays;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -40,14 +42,25 @@ public class LMStudioService {
                                 .header("Content-Type", "application/json"),
                         String.class
                 ))
+                .timeout(Duration.ofSeconds(1600))
+                .doOnError(e -> {
+                    if (e instanceof TimeoutException) {
+                        log.error("Timeout al procesar texto en LM Studio. Prompt: {}", prompt);
+                    }
+                })
                 .map(response -> {
                     try {
                         JsonNode jsonNode = objectMapper.readValue(response, JsonNode.class);
                         JsonNode contentNode = jsonNode.get("choices").get(0).get("message").get("content");
                         return contentNode.isString() ? contentNode.getValue().toString() : "";
                     } catch (Exception e) {
-                        throw new RuntimeException("Error al procesar la respuesta de LM Studio", e);
+                        log.error("Error al procesar la respuesta de LM Studio", e);
+                        return "Error al procesar la respuesta";
                     }
+                })
+                .onErrorResume(e -> {
+                    log.error("Error al comunicarse con LM Studio", e);
+                    return Mono.just("Error de comunicación con el servicio");
                 });
     }
 
@@ -57,7 +70,11 @@ public class LMStudioService {
     }
 
     public Mono<String> identificarTipoConsulta(String consultaTraducida) {
-        String prompt = "Determina si la siguiente consulta se trata de buscar múltiples recetas por ingredientes, obtener detalles de una receta específica, o cómo preparar una receta específica: '" + consultaTraducida + "'. Responde SOLO con 'ingredientes', 'detalles_receta', o 'preparacion_receta'.";
+        String prompt = "Analiza la siguiente consulta y determina si se trata de:\n" +
+                "1. Buscar múltiples recetas por ingredientes disponibles\n" +
+                "2. Obtener detalles y preparación de una receta específica\n" +
+                "Consulta: '" + consultaTraducida + "'\n" +
+                "Responde SOLO con el número correspondiente (1 o 2).";
         return procesarTexto(prompt).map(String::trim);
     }
 
@@ -75,12 +92,10 @@ public class LMStudioService {
 
     public Mono<String> generarRespuestaRecetas(String tipo, String respuestaSpoonacular) {
         String prompt;
-        if ("ingredientes".equals(tipo)) {
-            prompt = "Genera una respuesta amigable en inglés para esta lista de recetas basadas en ingredientes: " + respuestaSpoonacular;
-        } else if ("detalles_receta".equals(tipo)) {
-            prompt = "Genera una respuesta amigable en inglés con los detalles de esta receta específica: " + respuestaSpoonacular;
+        if ("1".equals(tipo)) {
+            prompt = "Genera una respuesta amigable en inglés listando los nombres de las recetas que se pueden hacer con estos ingredientes: " + respuestaSpoonacular;
         } else {
-            prompt = "Genera una respuesta amigable en inglés explicando cómo preparar esta receta: " + respuestaSpoonacular;
+            prompt = "Genera una respuesta amigable en inglés con los detalles y la preparación de esta receta específica: " + respuestaSpoonacular;
         }
         return procesarTexto(prompt);
     }
@@ -108,6 +123,7 @@ public class LMStudioService {
                     try {
                         return objectMapper.readValue(respuesta, Argument.mapOf(String.class, String.class));
                     } catch (Exception e) {
+                        log.error("Error al procesar la respuesta JSON", e);
                         throw new RuntimeException("Error al procesar la respuesta JSON", e);
                     }
                 });
