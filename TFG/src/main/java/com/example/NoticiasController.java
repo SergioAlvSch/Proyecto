@@ -4,7 +4,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.views.View;
 import jakarta.inject.Inject;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,21 +30,45 @@ public class NoticiasController {
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Mono<Map<String, String>> obtenerNoticias(@Body Map<String, String> peticion) {
+    public Flux<Map<String, String>> obtenerNoticias(@Body Map<String, String> peticion) {
         String feedUrl = peticion.get("texto");
-        return rssReaderService.readRssFeed(feedUrl)
-                .flatMap(noticias -> lmStudioService.procesarNoticias(noticias))
-                .flatMap(lmStudioService::traducirRespuesta)
-                .map(resumen -> {
-                    Map<String, String> resultado = new HashMap<>();
-                    resultado.put("respuesta", resumen);
-                    return resultado;
-                })
-                .onErrorResume(e -> {
-                    log.error("Error al obtener noticias: ", e);
-                    Map<String, String> error = new HashMap<>();
-                    error.put("respuesta", "Lo siento, hubo un error al obtener las noticias: " + e.getMessage());
-                    return Mono.just(error);
-                });
+        return Flux.concat(
+                emitirRespuesta("Leyendo feed RSS..."),
+                rssReaderService.readRssFeed(feedUrl)
+                        .concatMap(noticias ->
+                                Flux.concat(
+                                        emitirRespuesta("Feed RSS leído. Procesando noticias..."),
+                                        lmStudioService.procesarNoticias(noticias)
+                                                .concatMap(resumenEnIngles ->
+                                                        Flux.concat(
+                                                                emitirRespuesta("Resumen en inglés generado"),
+                                                                emitirRespuesta("Traduciendo resumen al español..."),
+                                                                lmStudioService.traducirRespuesta(resumenEnIngles)
+                                                                        .map(resumenFinal -> {
+                                                                            Map<String, String> resultado = new HashMap<>();
+                                                                            resultado.put("respuesta", resumenFinal);
+                                                                            return resultado;
+                                                                        })
+                                                        )
+                                                )
+                                )
+                        )
+        ).onErrorResume(e -> {
+            log.error("Error al obtener noticias: ", e);
+            return Flux.just(crearRespuestaError(feedUrl, e));
+        });
+    }
+
+    private Flux<Map<String, String>> emitirRespuesta(String mensaje) {
+        Map<String, String> respuesta = new HashMap<>();
+        respuesta.put("respuesta", mensaje);
+        return Flux.just(respuesta);
+    }
+
+    private Map<String, String> crearRespuestaError(String textoOriginal, Throwable e) {
+        Map<String, String> error = new HashMap<>();
+        error.put("peticion", textoOriginal);
+        error.put("respuesta", "Error: " + e.getMessage());
+        return error;
     }
 }

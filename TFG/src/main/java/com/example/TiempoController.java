@@ -2,14 +2,12 @@ package com.example;
 
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
-import io.micronaut.serde.ObjectMapper;
 import io.micronaut.views.View;
 import jakarta.inject.Inject;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,9 +21,6 @@ public class TiempoController {
     @Inject
     private LMStudioService lmStudioService;
 
-    @Inject
-    private ObjectMapper objectMapper;
-
     @Get("/")
     @View("tiempo_template")
     public Map<String, Object> getTiempo() {
@@ -35,37 +30,57 @@ public class TiempoController {
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Mono<Map<String, String>> procesarConsultaTiempo(@Body Map<String, String> peticion) {
+    public Flux<Map<String, String>> procesarConsultaTiempo(@Body Map<String, String> peticion) {
         String textoOriginal = peticion.get("texto");
-        return lmStudioService.extraerInformacionViaje(textoOriginal)
-                .flatMap(infoViaje -> {
-                    String destino = infoViaje.get("destino");
-                    int diasHastaViaje = Integer.parseInt(infoViaje.get("diasHastaViaje"));
-                    int duracionViaje = Integer.parseInt(infoViaje.get("duracionViaje"));
-                    return weatherService.obtenerPronostico(destino, diasHastaViaje, duracionViaje);
-                })
-                .flatMap(pronostico -> {
-                    try {
-                        String pronosticoJson = objectMapper.writeValueAsString(pronostico);
-                        return lmStudioService.generarConsejoRopa(pronosticoJson);
-                    } catch (IOException e) {
-                        log.error("Error al serializar el pronóstico", e);
-                        return Mono.error(new RuntimeException("Error al procesar el pronóstico del tiempo", e));
-                    }
-                })
-                .flatMap(lmStudioService::traducirRespuesta)
-                .map(consejo -> {
-                    Map<String, String> resultado = new HashMap<>();
-                    resultado.put("peticion", textoOriginal);
-                    resultado.put("respuesta", consejo);
-                    return resultado;
-                })
-                .onErrorResume(e -> {
-                    log.error("Error al procesar la consulta de tiempo: ", e);
-                    Map<String, String> error = new HashMap<>();
-                    error.put("peticion", textoOriginal);
-                    error.put("respuesta", "Lo siento, hubo un error al procesar tu consulta de tiempo: " + e.getMessage());
-                    return Mono.just(error);
-                });
+        return Flux.concat(
+                emitirRespuesta("Extrayendo información del viaje..."),
+                lmStudioService.extraerInformacionViaje(textoOriginal)
+                        .concatMap(infoViaje ->
+                                Flux.concat(
+                                        emitirRespuesta("Información extraída: " + infoViaje),
+                                        emitirRespuesta("Obteniendo pronóstico del tiempo..."),
+                                        weatherService.obtenerPronostico(
+                                                        infoViaje.get("destino"),
+                                                        Integer.parseInt(infoViaje.get("diasHastaViaje")),
+                                                        Integer.parseInt(infoViaje.get("duracionViaje"))
+                                                )
+                                                .concatMap(pronostico ->
+                                                        Flux.concat(
+                                                                emitirRespuesta("Pronóstico obtenido"),
+                                                                emitirRespuesta("Generando consejo de ropa..."),
+                                                                lmStudioService.generarConsejoRopa(pronostico.toString())
+                                                                        .concatMap(consejoEnIngles ->
+                                                                                Flux.concat(
+                                                                                        emitirRespuesta("Consejo generado en inglés"),
+                                                                                        emitirRespuesta("Traduciendo consejo al español..."),
+                                                                                        lmStudioService.traducirRespuesta(consejoEnIngles)
+                                                                                                .map(consejoFinal -> {
+                                                                                                    Map<String, String> resultado = new HashMap<>();
+                                                                                                    resultado.put("respuesta", consejoFinal);
+                                                                                                    return resultado;
+                                                                                                })
+                                                                                )
+                                                                        )
+                                                        )
+                                                )
+                                )
+                        )
+        ).onErrorResume(e -> {
+            log.error("Error al procesar la consulta de tiempo: ", e);
+            return Flux.just(crearRespuestaError(textoOriginal, e));
+        });
+    }
+
+    private Flux<Map<String, String>> emitirRespuesta(String mensaje) {
+        Map<String, String> respuesta = new HashMap<>();
+        respuesta.put("respuesta", mensaje);
+        return Flux.just(respuesta);
+    }
+
+    private Map<String, String> crearRespuestaError(String textoOriginal, Throwable e) {
+        Map<String, String> error = new HashMap<>();
+        error.put("peticion", textoOriginal);
+        error.put("respuesta", "Error: " + e.getMessage());
+        return error;
     }
 }

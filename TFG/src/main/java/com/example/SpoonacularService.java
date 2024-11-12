@@ -4,7 +4,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,12 +21,12 @@ public class SpoonacularService {
         this.client = client;
     }
 
-    public Mono<String> realizarPeticionPersonalizada(String url) {
-        return Mono.defer(() -> attemptRequest(url, 0));
+    public Flux<String> realizarPeticionPersonalizada(String url) {
+        return Flux.defer(() -> attemptRequest(url, 0));
     }
 
-    private Mono<String> attemptRequest(String url, int attempt) {
-        return Mono.from(client.retrieve(HttpRequest.GET(url), String.class))
+    private Flux<String> attemptRequest(String url, int attempt) {
+        return Flux.from(client.retrieve(HttpRequest.GET(url), String.class))
                 .onErrorResume(throwable -> {
                     if (throwable instanceof HttpClientResponseException) {
                         HttpClientResponseException responseException = (HttpClientResponseException) throwable;
@@ -34,11 +34,12 @@ public class SpoonacularService {
                         if (statusCode >= 500 && attempt < MAX_RETRIES - 1) {
                             log.warn("Intento {} fallido para URL: {}. Reintentando en {} segundos...",
                                     attempt + 1, url, RETRY_DELAY.getSeconds());
-                            return Mono.delay(RETRY_DELAY)
-                                    .flatMap(__ -> attemptRequest(url, attempt + 1));
+                            return Flux.just("") // Emite un elemento vacío
+                                    .delayElements(RETRY_DELAY) // Retrasa este elemento
+                                    .flatMap(__ -> attemptRequest(url, attempt + 1)); // Intenta de nuevo
                         }
                     }
-                    return Mono.error(throwable);
+                    return Flux.error(throwable);
                 });
     }
 }

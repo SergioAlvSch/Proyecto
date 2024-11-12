@@ -5,7 +5,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.serde.ObjectMapper;
 import jakarta.inject.Singleton;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,13 +31,13 @@ public class WeatherService {
         this.objectMapper = objectMapper;
     }
 
-    public Mono<Map<String, Object>> obtenerPronostico(String destino, int diasHastaViaje, int duracionViaje) {
+    public Flux<Map<String, Object>> obtenerPronostico(String destino, int diasHastaViaje, int duracionViaje) {
         String destinoEncoded = URLEncoder.encode(destino, StandardCharsets.UTF_8);
         String url = baseUrl + "/forecast.json?key=" + apiKey + "&q=" + destinoEncoded + "&days=" + (diasHastaViaje + duracionViaje);
-        return Mono.from(client.retrieve(HttpRequest.GET(url), String.class))
+        return Flux.from(client.retrieve(HttpRequest.GET(url), String.class))
                 .onErrorResume(e -> {
                     log.error("Error al obtener el pronóstico para " + destino, e);
-                    return Mono.just("No se pudo obtener el pronóstico para " + destino);
+                    return Flux.just("No se pudo obtener el pronóstico para " + destino);
                 })
                 .map(this::procesarRespuesta);
     }
@@ -74,29 +74,5 @@ public class WeatherService {
             log.error("Error al procesar la respuesta JSON del pronóstico", e);
             throw new RuntimeException("Error al procesar el pronóstico del tiempo", e);
         }
-    }
-
-    private String formatearPronostico(Map<String, Object> pronostico) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Pronóstico del tiempo para ").append(pronostico.get("ciudad")).append(", ").append(pronostico.get("pais")).append(":\n\n");
-
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> pronosticoDiario = (List<Map<String, Object>>) pronostico.get("pronostico");
-        DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", new java.util.Locale("es", "ES"));
-
-        for (Map<String, Object> dia : pronosticoDiario) {
-            LocalDate fecha = LocalDate.parse((String) dia.get("fecha"), inputFormatter);
-            String fechaFormateada = fecha.format(outputFormatter);
-
-            sb.append(fechaFormateada).append(":\n");
-            sb.append("  Temperatura máxima: ").append(dia.get("maxtemp_c")).append("°C\n");
-            sb.append("  Temperatura mínima: ").append(dia.get("mintemp_c")).append("°C\n");
-            sb.append("  Temperatura promedio: ").append(dia.get("avgtemp_c")).append("°C\n");
-            sb.append("  Condición: ").append(dia.get("condicion")).append("\n");
-            sb.append("  Probabilidad de lluvia: ").append(dia.get("probabilidad_lluvia")).append("%\n\n");
-        }
-
-        return sb.toString();
     }
 }

@@ -13,10 +13,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      background-color: #f0f0f0;
     }
     h1 {
       text-align: center;
       margin-bottom: 20px;
+      color: #333;
     }
     .nav-buttons {
       margin-bottom: 20px;
@@ -31,6 +33,7 @@
       cursor: pointer;
       margin: 0 5px;
       border-radius: 5px;
+      transition: background-color 0.3s;
     }
     .nav-button:hover {
       background-color: #d1e8ff;
@@ -43,6 +46,8 @@
       width: calc(100% - 22px);
       padding: 10px;
       margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
     }
     #chat-container {
       border: 1px solid #ddd;
@@ -50,6 +55,8 @@
       height: 400px;
       overflow-y: auto;
       width: calc(100% - 42px);
+      background-color: white;
+      border-radius: 5px;
     }
     .message {
       margin-bottom: 10px;
@@ -70,6 +77,8 @@
       border: none;
       cursor: pointer;
       width: 100%;
+      border-radius: 5px;
+      transition: background-color 0.3s;
     }
     .submit-button:hover {
       background-color: #45a049;
@@ -82,9 +91,10 @@
   <button class="nav-button" onclick="window.location.href='/'">Menú Principal</button>
   <button class="nav-button" onclick="window.location.href='/noticias'">Noticias</button>
   <button class="nav-button" onclick="window.location.href='/tiempo'">Tiempo</button>
+  <button class="nav-button" onclick="window.location.href='/chat'">Chat</button>
 </div>
 <form id="peticionForm">
-  <input type="text" id="peticion" placeholder="Escribe tu pregunta aquí" required>
+  <input type="text" id="peticion" placeholder="Escribe tu pregunta sobre recetas aquí" required>
   <button type="submit" class="submit-button">Enviar</button>
 </form>
 <div id="chat-container"></div>
@@ -96,9 +106,6 @@
 
     addMessage(peticion, 'user-message');
 
-    // Mostrar mensaje de carga
-    var loadingMessageId = addMessage('Procesando tu solicitud...', 'bot-message');
-
     fetch('/recetas/procesar', {
       method: 'POST',
       body: JSON.stringify({ texto: peticion }),
@@ -107,20 +114,28 @@
       }
     })
             .then(response => {
-              if (!response.ok) {
-                throw new Error('Error en la respuesta del servidor');
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+
+              function readChunk() {
+                return reader.read().then(({ done, value }) => {
+                  if (done) {
+                    return;
+                  }
+                  const chunk = decoder.decode(value);
+                  const messages = chunk.split('\n').filter(Boolean);
+                  messages.forEach(message => {
+                    const data = JSON.parse(message);
+                    addMessage(data.respuesta, 'bot-message');
+                  });
+                  return readChunk();
+                });
               }
-              return response.json();
-            })
-            .then(data => {
-              // Eliminar el mensaje de carga
-              removeMessage(loadingMessageId);
-              addMessage(data.respuesta, 'bot-message');
+
+              return readChunk();
             })
             .catch(error => {
               console.error('Error:', error);
-              // Eliminar el mensaje de carga
-              removeMessage(loadingMessageId);
               addMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.', 'bot-message');
             });
 
@@ -134,14 +149,6 @@
     messageElement.textContent = message;
     chatContainer.appendChild(messageElement);
     chatContainer.scrollTop = chatContainer.scrollHeight;
-    return messageElement.id = 'msg-' + Date.now(); // Retorna un ID único para el mensaje
-  }
-
-  function removeMessage(messageId) {
-    var messageElement = document.getElementById(messageId);
-    if (messageElement) {
-      messageElement.remove();
-    }
   }
 </script>
 </body>
