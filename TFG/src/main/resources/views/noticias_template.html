@@ -105,6 +105,7 @@
         var peticion = document.getElementById('peticion').value;
 
         addMessage(peticion, 'user-message');
+        addMessage('Procesando...', 'bot-message processing');
 
         fetch('/noticias/procesar', {
             method: 'POST',
@@ -116,38 +117,90 @@
             .then(response => {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
 
                 function readChunk() {
                     return reader.read().then(({ done, value }) => {
                         if (done) {
+                            console.log("Stream completo");
+                            if (buffer) {
+                                processBuffer(buffer);
+                            }
                             return;
                         }
-                        const chunk = decoder.decode(value);
-                        const messages = chunk.split('\n').filter(Boolean);
-                        messages.forEach(message => {
-                            const data = JSON.parse(message);
-                            addMessage(data.respuesta, 'bot-message');
-                        });
+
+                        const chunk = decoder.decode(value, { stream: true });
+                        console.log("Chunk recibido:", chunk);
+                        buffer += chunk;
+                        console.log("Buffer actual:", buffer);
+
+                        let newlineIndex;
+                        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                            const line = buffer.slice(0, newlineIndex);
+                            buffer = buffer.slice(newlineIndex + 1);
+                            processBuffer(line);
+                        }
+
                         return readChunk();
                     });
+                }
+
+                function processBuffer(bufferContent) {
+                    console.log("Procesando buffer:", bufferContent);
+                    if (bufferContent.trim()) {
+                        try {
+                            const dataArray = JSON.parse(bufferContent);
+                            console.log("Datos recibidos:", dataArray);
+                            if (Array.isArray(dataArray)) {
+                                dataArray.forEach(data => {
+                                    if (data.respuesta && data.respuesta !== "Procesando petición...") {
+                                        updateLastMessage(data.respuesta);
+                                    }
+                                });
+                            } else if (dataArray.respuesta && dataArray.respuesta !== "Procesando petición...") {
+                                updateLastMessage(dataArray.respuesta);
+                            }
+                        } catch (error) {
+                            console.error('Error parsing JSON:', error, 'Content:', bufferContent);
+                        }
+                    }
                 }
 
                 return readChunk();
             })
             .catch(error => {
                 console.error('Error:', error);
-                addMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.', 'bot-message');
+                updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.');
             });
 
         document.getElementById('peticion').value = '';
     });
 
     function addMessage(message, className) {
+        console.log("Añadiendo mensaje:", message, "Clase:", className);
         var chatContainer = document.getElementById('chat-container');
         var messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
         messageElement.textContent = message;
         chatContainer.appendChild(messageElement);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function updateLastMessage(message) {
+        console.log("Actualizando último mensaje con:", message);
+        var chatContainer = document.getElementById('chat-container');
+        var lastMessage = chatContainer.lastElementChild;
+        if (lastMessage && lastMessage.classList.contains('processing')) {
+            lastMessage.textContent = message;
+            lastMessage.classList.remove('processing');
+        } else {
+            // Eliminar el mensaje "Procesando..." si existe
+            var processingMessage = chatContainer.querySelector('.processing');
+            if (processingMessage) {
+                chatContainer.removeChild(processingMessage);
+            }
+            addMessage(message, 'bot-message');
+        }
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 </script>

@@ -11,8 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +30,15 @@ public class WeatherService {
         this.objectMapper = objectMapper;
     }
 
-    public Flux<Map<String, Object>> obtenerPronostico(String destino, int diasHastaViaje, int duracionViaje) {
+    public Flux<Map<String, Object>> obtenerPronostico(String destino, int diasTotales) {
         String destinoEncoded = URLEncoder.encode(destino, StandardCharsets.UTF_8);
-        String url = baseUrl + "/forecast.json?key=" + apiKey + "&q=" + destinoEncoded + "&days=" + (diasHastaViaje + duracionViaje);
+        int diasPronostico = Math.min(diasTotales, 3); // Limitado a 3 días en la versión gratuita
+        String url = baseUrl + "/forecast.json?key=" + apiKey + "&q=" + destinoEncoded + "&days=" + diasPronostico;
+        log.info("Realizando petición a WeatherAPI: {}", url);
+
         return Flux.from(client.retrieve(HttpRequest.GET(url), String.class))
+                .timeout(Duration.ofSeconds(30))
+                .doOnNext(response -> log.info("Respuesta recibida de WeatherAPI para {}", destino))
                 .onErrorResume(e -> {
                     log.error("Error al obtener el pronóstico para " + destino, e);
                     return Flux.just("No se pudo obtener el pronóstico para " + destino);
@@ -44,14 +48,13 @@ public class WeatherService {
 
     private Map<String, Object> procesarRespuesta(String respuestaJson) {
         try {
+            log.debug("Procesando respuesta JSON: {}", respuestaJson);
             JsonNode jsonNode = objectMapper.readValue(respuestaJson, JsonNode.class);
             Map<String, Object> resultado = new HashMap<>();
 
-            // Información de la ubicación
             resultado.put("ciudad", jsonNode.get("location").get("name").getStringValue());
             resultado.put("pais", jsonNode.get("location").get("country").getStringValue());
 
-            // Pronóstico para los próximos días
             List<Map<String, Object>> pronosticoDiario = new ArrayList<>();
             JsonNode forecastDays = jsonNode.get("forecast").get("forecastday");
             if (forecastDays.isArray()) {
@@ -68,7 +71,9 @@ public class WeatherService {
                 }
             }
             resultado.put("pronostico", pronosticoDiario);
+            resultado.put("diasPronosticados", pronosticoDiario.size());
 
+            log.debug("Pronóstico procesado: {}", resultado);
             return resultado;
         } catch (Exception e) {
             log.error("Error al procesar la respuesta JSON del pronóstico", e);

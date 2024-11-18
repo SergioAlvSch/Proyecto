@@ -1,13 +1,16 @@
 package com.example;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
+import io.micronaut.serde.ObjectMapper;
 import io.micronaut.views.View;
 import jakarta.inject.Inject;
 import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,10 +19,13 @@ public class NoticiasController {
     private static final Logger log = LoggerFactory.getLogger(NoticiasController.class);
 
     @Inject
-    private RssReaderService rssReaderService;
+    ObjectMapper objectMapper;
 
     @Inject
     private LMStudioService lmStudioService;
+
+    @Inject
+    private RssReaderService rssReaderService;
 
     @Get("/")
     @View("noticias_template")
@@ -30,39 +36,38 @@ public class NoticiasController {
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Flux<Map<String, String>> obtenerNoticias(@Body Map<String, String> peticion) {
+    public Flux<String> obtenerNoticias(@Body Map<String, String> peticion) {
         String feedUrl = peticion.get("texto");
+        log.info("Recibida solicitud de noticias para URL: {}", feedUrl);
         return Flux.concat(
-                emitirRespuesta("Leyendo feed RSS..."),
+                emitirRespuesta("Procesando petición..."),
                 rssReaderService.readRssFeed(feedUrl)
-                        .concatMap(noticias ->
-                                Flux.concat(
-                                        emitirRespuesta("Feed RSS leído. Procesando noticias..."),
-                                        lmStudioService.procesarNoticias(noticias)
-                                                .concatMap(resumenEnIngles ->
-                                                        Flux.concat(
-                                                                emitirRespuesta("Resumen en inglés generado"),
-                                                                emitirRespuesta("Traduciendo resumen al español..."),
-                                                                lmStudioService.traducirRespuesta(resumenEnIngles)
-                                                                        .map(resumenFinal -> {
-                                                                            Map<String, String> resultado = new HashMap<>();
-                                                                            resultado.put("respuesta", resumenFinal);
-                                                                            return resultado;
-                                                                        })
-                                                        )
-                                                )
-                                )
+                        .flatMap(noticias ->
+                                lmStudioService.procesarNoticias(noticias)
+                                        .flatMap(resumenEnIngles ->
+                                                lmStudioService.traducirRespuesta(resumenEnIngles)
+                                                        .flatMap(this::emitirRespuesta)
+                                        )
                         )
         ).onErrorResume(e -> {
             log.error("Error al obtener noticias: ", e);
-            return Flux.just(crearRespuestaError(feedUrl, e));
+            return Flux.just(crearRespuestaError(feedUrl, e).toString());
         });
     }
 
-    private Flux<Map<String, String>> emitirRespuesta(String mensaje) {
+    private Flux<String> emitirRespuesta(String mensaje) {
         Map<String, String> respuesta = new HashMap<>();
         respuesta.put("respuesta", mensaje);
-        return Flux.just(respuesta);
+        try {
+            String jsonRespuesta = objectMapper.writeValueAsString(respuesta);
+            log.info("Emitiendo respuesta JSON: {}", jsonRespuesta);
+            return Flux.just(jsonRespuesta);
+        } catch (JsonProcessingException e) {
+            log.error("Error al serializar la respuesta", e);
+            return Flux.error(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Map<String, String> crearRespuestaError(String textoOriginal, Throwable e) {
