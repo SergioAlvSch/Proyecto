@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -35,24 +36,29 @@ public class NoticiasController {
 
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
     public Flux<String> obtenerNoticias(@Body Map<String, String> peticion) {
-        String feedUrl = peticion.get("texto");
-        log.info("Recibida solicitud de noticias para URL: {}", feedUrl);
-        return Flux.concat(
-                emitirRespuesta("Procesando petición..."),
-                rssReaderService.readRssFeed(feedUrl)
-                        .flatMap(noticias ->
-                                lmStudioService.procesarNoticias(noticias)
-                                        .flatMap(resumenEnIngles ->
-                                                lmStudioService.traducirRespuesta(resumenEnIngles)
-                                                        .flatMap(this::emitirRespuesta)
-                                        )
-                        )
-        ).onErrorResume(e -> {
-            log.error("Error al obtener noticias: ", e);
-            return Flux.just(crearRespuestaError(feedUrl, e).toString());
-        });
+        return Flux.defer(() -> {
+                    String feedUrl = peticion.get("texto");
+                    log.info("Recibida solicitud de noticias para URL: {}", feedUrl);
+                    return Flux.concat(
+                            emitirRespuesta("Procesando petición..."),
+                            rssReaderService.readRssFeed(feedUrl)
+                                    .flatMap(noticias ->
+                                            lmStudioService.procesarNoticias(noticias)
+                                                    .flatMap(resumenEnIngles ->
+                                                            lmStudioService.traducirRespuesta(resumenEnIngles)
+                                                                    .collectList()
+                                                                    .flatMap(traduccion -> emitirRespuesta(String.join("", traduccion))
+                                                                            .collectList()
+                                                                            .map(list -> String.join("", list)))
+                                                    )
+                                    )
+                    ).onErrorResume(e -> {
+                        log.error("Error al obtener noticias: ", e);
+                        return Flux.just(crearRespuestaError(feedUrl, e));
+                    });
+                }).delayElements(Duration.ofMillis(100))
+                .timeout(Duration.ofMinutes(30));
     }
 
     private Flux<String> emitirRespuesta(String mensaje) {
@@ -70,10 +76,17 @@ public class NoticiasController {
         }
     }
 
-    private Map<String, String> crearRespuestaError(String textoOriginal, Throwable e) {
+    private String crearRespuestaError(String textoOriginal, Throwable e) {
         Map<String, String> error = new HashMap<>();
         error.put("peticion", textoOriginal);
         error.put("respuesta", "Error: " + e.getMessage());
-        return error;
+        try {
+            return objectMapper.writeValueAsString(error);
+        } catch (JsonProcessingException jpe) {
+            log.error("Error al serializar respuesta de error", jpe);
+            return "{\"respuesta\": \"Error interno del servidor\"}";
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 }

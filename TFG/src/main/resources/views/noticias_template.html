@@ -149,19 +149,20 @@
                     console.log("Procesando buffer:", bufferContent);
                     if (bufferContent.trim()) {
                         try {
-                            const dataArray = JSON.parse(bufferContent);
-                            console.log("Datos recibidos:", dataArray);
-                            if (Array.isArray(dataArray)) {
-                                dataArray.forEach(data => {
-                                    if (data.respuesta && data.respuesta !== "Procesando petición...") {
-                                        updateLastMessage(data.respuesta);
+                            const data = JSON.parse(bufferContent);
+                            console.log("Datos recibidos:", data);
+                            if (Array.isArray(data)) {
+                                data.forEach(item => {
+                                    if (item.respuesta) {
+                                        updateLastMessage(item.respuesta);
                                     }
                                 });
-                            } else if (dataArray.respuesta && dataArray.respuesta !== "Procesando petición...") {
-                                updateLastMessage(dataArray.respuesta);
+                            } else if (data.respuesta) {
+                                updateLastMessage(data.respuesta);
                             }
                         } catch (error) {
                             console.error('Error parsing JSON:', error, 'Content:', bufferContent);
+                            updateLastMessage("Error al procesar la respuesta del servidor");
                         }
                     }
                 }
@@ -190,16 +191,22 @@
         console.log("Actualizando último mensaje con:", message);
         var chatContainer = document.getElementById('chat-container');
         var lastMessage = chatContainer.lastElementChild;
+
+        // Reemplazar saltos de línea con <br>
+        message = message.replace(/\n/g, '<br>');
+
         if (lastMessage && lastMessage.classList.contains('processing')) {
-            lastMessage.textContent = message;
-            lastMessage.classList.remove('processing');
-        } else {
-            // Eliminar el mensaje "Procesando..." si existe
-            var processingMessage = chatContainer.querySelector('.processing');
-            if (processingMessage) {
-                chatContainer.removeChild(processingMessage);
+            if (message === "Procesando petición...") {
+                lastMessage.textContent = message;
+            } else {
+                lastMessage.innerHTML = message;
+                lastMessage.classList.remove('processing');
             }
-            addMessage(message, 'bot-message');
+        } else {
+            var messageElement = document.createElement('div');
+            messageElement.className = 'message bot-message';
+            messageElement.innerHTML = message;
+            chatContainer.appendChild(messageElement);
         }
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }

@@ -41,7 +41,7 @@ public class LMStudioService {
                                 .header("Content-Type", "application/json"),
                         String.class
                 ))
-                .timeout(Duration.ofSeconds(1600))
+                .timeout(Duration.ofMinutes(30))
                 .onErrorResume(e -> {
                     if (e instanceof TimeoutException) {
                         log.error("Timeout al procesar texto en LM Studio. Prompt: {}", prompt);
@@ -104,17 +104,19 @@ public class LMStudioService {
 
     public Flux<String> traducirRespuesta(String respuestaEnIngles) {
         log.info("Iniciando traducción de respuesta");
-        String prompt = "Traduce la siguiente respuesta al español, manteniendo un tono amigable y conversacional. Responde SOLO con la traducción en español, sin incluir el texto original en inglés ni ninguna explicación adicional: '" + respuestaEnIngles + "'";
+        String prompt = "Traduce la siguiente respuesta al español, manteniendo un tono amigable y conversacional. Mantén los saltos de línea originales. Responde SOLO con la traducción en español, sin incluir el texto original en inglés ni ninguna explicación adicional: '" + respuestaEnIngles + "'";
         return procesarTexto(prompt)
+                .collectList()
+                .map(lista -> String.join("", lista))
                 .map(respuesta -> {
-                    // Eliminar cualquier texto en inglés o explicaciones adicionales
                     int indexOfEnglish = respuesta.toLowerCase().indexOf("(friendly and conversational");
                     if (indexOfEnglish != -1) {
                         respuesta = respuesta.substring(0, indexOfEnglish).trim();
                     }
                     log.info("Traducción completada: {}", respuesta);
                     return respuesta;
-                });
+                })
+                .flux();
     }
 
     public Flux<String> procesarNoticias(List<SyndEntry> noticias) {
