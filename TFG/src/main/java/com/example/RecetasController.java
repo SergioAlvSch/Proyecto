@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -48,15 +49,15 @@ public class RecetasController {
                 lmStudioService.traducirConsulta(texto)
                         .flatMap(consultaTraducida ->
                                 lmStudioService.identificarTipoConsulta(consultaTraducida)
-                                        .flatMap(tipoRespuesta -> {
-                                            String tipo = extraerTipoConsulta(tipoRespuesta);
+                                        .flatMap(tipo -> {
+                                            log.info("Tipo de consulta identificado: {}", tipo);
                                             return procesarConsultaSegunTipo(tipo, consultaTraducida);
                                         })
                         )
         ).onErrorResume(e -> {
             log.error("Error al procesar la petición de receta: ", e);
             return Flux.just(crearRespuestaError(texto, e).toString());
-        });
+        }).timeout(Duration.ofMinutes(30));
     }
 
     private Flux<String> procesarConsultaSegunTipo(String tipo, String consultaTraducida) {
@@ -88,9 +89,11 @@ public class RecetasController {
         String url = baseUrl + "?" + (tipo.equals("ingredientes") ? "includeIngredients=" : "query=")
                 + URLEncoder.encode(parametros, StandardCharsets.UTF_8) + "&apiKey=" + apiKey;
 
+        String tipoFinal = tipo.equals("ingredientes") ? "1" : "2";
+
         return spoonacularService.realizarPeticionPersonalizada(url)
                 .flatMap(respuestaSpoonacular ->
-                        lmStudioService.generarRespuestaRecetas(tipo, respuestaSpoonacular)
+                        lmStudioService.generarRespuestaRecetas(tipoFinal, respuestaSpoonacular)
                                 .flatMap(respuestaEnIngles ->
                                         lmStudioService.traducirRespuesta(respuestaEnIngles)
                                                 .flatMap(this::emitirRespuesta)

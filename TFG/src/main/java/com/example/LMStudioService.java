@@ -16,6 +16,8 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Singleton
@@ -45,8 +47,10 @@ public class LMStudioService {
                 .onErrorResume(e -> {
                     if (e instanceof TimeoutException) {
                         log.error("Timeout al procesar texto en LM Studio. Prompt: {}", prompt);
+                        return Flux.just("Lo siento, la respuesta está tardando demasiado. Por favor, intenta de nuevo.");
                     }
-                    return Flux.error(e);
+                    log.error("Error al comunicarse con LM Studio", e);
+                    return Flux.just("Error de comunicación con el servicio. Por favor, intenta más tarde.");
                 })
                 .map(response -> {
                     try {
@@ -59,16 +63,13 @@ public class LMStudioService {
                         log.error("Error al procesar la respuesta de LM Studio", e);
                         return "Error al procesar la respuesta";
                     }
-                })
-                .onErrorResume(e -> {
-                    log.error("Error al comunicarse con LM Studio", e);
-                    return Flux.just("Error de comunicación con el servicio");
                 });
     }
 
     public Flux<String> traducirConsulta(String consulta) {
         String prompt = "Traduce la siguiente consulta al inglés, manteniendo el significado y la intención original: '" + consulta + "'. Responde SOLO con la traducción, sin texto adicional.";
-        return procesarTexto(prompt).map(String::trim);
+        return procesarTexto(prompt)
+                .map(respuesta -> respuesta.replaceAll("(?i)Response:\\s*", "").trim());
     }
 
     public Flux<String> identificarTipoConsulta(String consultaTraducida) {
@@ -77,14 +78,26 @@ public class LMStudioService {
                 "2. Obtener detalles y preparación de una receta específica\n" +
                 "Consulta: '" + consultaTraducida + "'\n" +
                 "Responde SOLO con el número correspondiente (1 o 2).";
-        return procesarTexto(prompt).map(String::trim);
+        return procesarTexto(prompt)
+                .map(respuesta -> {
+                    // Extraer solo el primer número (1 o 2) de la respuesta
+                    Pattern pattern = Pattern.compile("\\b[12]\\b");
+                    Matcher matcher = pattern.matcher(respuesta);
+                    return matcher.find() ? matcher.group() : "0"; // Devuelve "0" si no se encuentra 1 o 2
+                });
     }
 
     public Flux<List<String>> extraerIngredientes(String consultaTraducida) {
         String prompt = "Extrae los ingredientes mencionados en la siguiente consulta: '" + consultaTraducida + "'. Responde con una lista de ingredientes separados por comas.";
         return procesarTexto(prompt)
-                .map(respuesta -> Arrays.asList(respuesta.split(",")))
-                .map(ingredientes -> ingredientes.stream().map(String::trim).collect(Collectors.toList()));
+                .map(respuesta -> {
+                    String[] partes = respuesta.split(":");
+                    String ingredientes = partes.length > 1 ? partes[partes.length - 1] : respuesta;
+                    return Arrays.asList(ingredientes.split(","))
+                            .stream()
+                            .map(String::trim)
+                            .collect(Collectors.toList());
+                });
     }
 
     public Flux<String> extraerNombreReceta(String consultaTraducida) {

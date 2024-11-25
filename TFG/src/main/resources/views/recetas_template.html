@@ -107,14 +107,22 @@
     addMessage(peticion, 'user-message');
     addMessage('Procesando...', 'bot-message processing');
 
+    const timeoutDuration = 900000; // 15 minutos en milisegundos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+
     fetch('/recetas/procesar', {
       method: 'POST',
       body: JSON.stringify({ texto: peticion }),
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      signal: controller.signal
     })
             .then(response => {
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
               const reader = response.body.getReader();
               const decoder = new TextDecoder();
               let buffer = '';
@@ -123,6 +131,7 @@
                 return reader.read().then(({ done, value }) => {
                   if (done) {
                     console.log("Stream completo");
+                    clearTimeout(timeoutId);
                     if (buffer) {
                       processBuffer(buffer);
                     }
@@ -134,47 +143,51 @@
                   buffer += chunk;
                   console.log("Buffer actual:", buffer);
 
-                  let newlineIndex;
-                  while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-                    const line = buffer.slice(0, newlineIndex);
-                    buffer = buffer.slice(newlineIndex + 1);
-                    processBuffer(line);
+                  while (true) {
+                    const jsonEndIndex = buffer.indexOf('}');
+                    if (jsonEndIndex === -1) break;
+
+                    const jsonStartIndex = buffer.lastIndexOf('{', jsonEndIndex);
+                    if (jsonStartIndex === -1) break;
+
+                    const jsonStr = buffer.slice(jsonStartIndex, jsonEndIndex + 1);
+                    buffer = buffer.slice(jsonEndIndex + 1);
+                    processBuffer(jsonStr);
                   }
 
                   return readChunk();
                 });
               }
 
-              function processBuffer(bufferContent) {
-                console.log("Procesando buffer:", bufferContent);
-                if (bufferContent.trim()) {
-                  try {
-                    const dataArray = JSON.parse(bufferContent);
-                    console.log("Datos recibidos:", dataArray);
-                    if (Array.isArray(dataArray)) {
-                      dataArray.forEach(data => {
-                        if (data.respuesta && data.respuesta !== "Procesando petición...") {
-                          updateLastMessage(data.respuesta);
-                        }
-                      });
-                    } else if (dataArray.respuesta && dataArray.respuesta !== "Procesando petición...") {
-                      updateLastMessage(dataArray.respuesta);
-                    }
-                  } catch (error) {
-                    console.error('Error parsing JSON:', error, 'Content:', bufferContent);
-                  }
-                }
-              }
-
               return readChunk();
             })
             .catch(error => {
+              clearTimeout(timeoutId);
               console.error('Error:', error);
-              updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.');
+              if (error.name === 'AbortError') {
+                updateLastMessage('La solicitud ha excedido el tiempo de espera. Por favor, intenta de nuevo.');
+              } else {
+                updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo más tarde.');
+              }
             });
 
     document.getElementById('peticion').value = '';
   });
+
+  function processBuffer(bufferContent) {
+    console.log("Procesando buffer:", bufferContent);
+    if (bufferContent.trim()) {
+      try {
+        const data = JSON.parse(bufferContent);
+        console.log("Datos recibidos:", data);
+        if (data.respuesta && data.respuesta !== "Procesando petición...") {
+          updateLastMessage(data.respuesta);
+        }
+      } catch (error) {
+        console.error('Error parsing JSON:', error, 'Content:', bufferContent);
+      }
+    }
+  }
 
   function addMessage(message, className) {
     console.log("Añadiendo mensaje:", message, "Clase:", className);
