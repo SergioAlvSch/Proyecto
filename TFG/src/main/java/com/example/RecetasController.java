@@ -122,13 +122,4 @@ public class RecetasController {
         error.put("respuesta", "Error: " + e.getMessage());
         return error;
     }
-
-    private String extraerTipoConsulta(String respuesta) {
-        Pattern pattern = Pattern.compile("\\b[12]\\b");
-        Matcher matcher = pattern.matcher(respuesta);
-        if (matcher.find()) {
-            return matcher.group();
-        }
-        return null;
-    }
 }

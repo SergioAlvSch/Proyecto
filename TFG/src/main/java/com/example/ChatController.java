@@ -32,42 +32,37 @@ public class ChatController {
 
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_EVENT_STREAM)
     public Flux<String> procesarMensaje(@Body Map<String, String> peticion) {
         String mensaje = peticion.get("texto");
         log.info("Recibida solicitud de chat: {}", mensaje);
-        return Flux.concat(
-                emitirRespuesta("Procesando mensaje..."),
-                lmStudioService.procesarTexto(mensaje)
-                        .flatMap(respuesta -> {
-                            log.info("Respuesta recibida de LMStudio: {}", respuesta);
-                            return emitirRespuesta(respuesta);
-                        })
-        ).onErrorResume(e -> {
-            log.error("Error al procesar el mensaje en el chat: ", e);
-            return Flux.just(crearRespuestaError(mensaje, e).toString());
-        });
+        return lmStudioService.procesarTexto(mensaje)
+                .defaultIfEmpty("No se recibió respuesta del servicio.")
+                .onErrorResume(e -> {
+                    log.error("Error al procesar el mensaje en el chat: ", e);
+                    return Flux.just("Error: " + e.getMessage());
+                });
     }
 
-    private Flux<String> emitirRespuesta(String mensaje) {
-        Map<String, String> respuesta = new HashMap<>();
-        respuesta.put("respuesta", mensaje);
-        try {
-            String jsonRespuesta = objectMapper.writeValueAsString(respuesta);
-            log.info("Emitiendo respuesta JSON: {}", jsonRespuesta);
-            return Flux.just(jsonRespuesta);
-        } catch (JsonProcessingException e) {
-            log.error("Error al serializar la respuesta", e);
-            return Flux.error(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private Map<String, String> crearRespuestaError(String textoOriginal, Throwable e) {
-        Map<String, String> error = new HashMap<>();
-        error.put("peticion", textoOriginal);
-        error.put("respuesta", "Error: " + e.getMessage());
-        return error;
-    }
+//    private Flux<String> emitirRespuesta(String mensaje) {
+//        Map<String, String> respuesta = new HashMap<>();
+//        respuesta.put("respuesta", mensaje);
+//        try {
+//            String jsonRespuesta = objectMapper.writeValueAsString(respuesta);
+//            log.info("Emitiendo respuesta JSON: {}", jsonRespuesta);
+//            return Flux.just(jsonRespuesta);
+//        } catch (JsonProcessingException e) {
+//            log.error("Error al serializar la respuesta", e);
+//            return Flux.error(e);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
+//
+//    private Map<String, String> crearRespuestaError(String textoOriginal, Throwable e) {
+//        Map<String, String> error = new HashMap<>();
+//        error.put("peticion", textoOriginal);
+//        error.put("respuesta", "Error: " + e.getMessage());
+//        return error;
+//    }
 }

@@ -5,16 +5,22 @@ import com.rometools.rome.feed.synd.SyndEntry;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.serde.ObjectMapper;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,47 +29,58 @@ import java.util.stream.Collectors;
 @Singleton
 public class LMStudioService {
     private static final Logger log = LoggerFactory.getLogger(LMStudioService.class);
-    private final HttpClient client;
-    private final String URL = "http://localhost:1234/v1";
     private final ObjectMapper objectMapper;
+    private final Runtime runtime;
 
-    public LMStudioService(HttpClient client, ObjectMapper objectMapper) {
-        this.client = client;
+    @Inject
+    @Client("http://localhost:11434")
+    HttpClient httpClient;
+
+    public LMStudioService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        this.runtime = Runtime.getRuntime();
     }
-    public Flux<String> procesarTexto(String prompt) {
-        log.info("Enviando prompt a LMStudio: {}", prompt);
-        Map<String, Object> body = Map.of(
-                "model", "local-model",
-                "messages", List.of(Map.of("role", "user", "content", prompt))
-        );
 
-        return Flux.from(client.retrieve(
-                        HttpRequest.POST(URL + "/chat/completions", body)
-                                .header("Content-Type", "application/json"),
-                        String.class
-                ))
-                .timeout(Duration.ofMinutes(30))
+    public Flux<String> procesarTexto(String prompt) {
+        log.info("Enviando prompt a Ollama: {}", prompt);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "llama2");
+        requestBody.put("prompt", prompt);
+
+        HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
+
+        return Flux.from(httpClient.retrieve(request, String.class))
+                .scan("", (acc, current) -> acc + current)
+                .map(this::extractResponseContent)
+                .filter(response -> !response.isEmpty())
+                .distinctUntilChanged()
+                .last()
+                .flux() // Convierte Mono a Flux
+                .doOnNext(response -> log.info("Contenido extraído final: {}", response))
                 .onErrorResume(e -> {
-                    if (e instanceof TimeoutException) {
-                        log.error("Timeout al procesar texto en LM Studio. Prompt: {}", prompt);
-                        return Flux.just("Lo siento, la respuesta está tardando demasiado. Por favor, intenta de nuevo.");
-                    }
-                    log.error("Error al comunicarse con LM Studio", e);
-                    return Flux.just("Error de comunicación con el servicio. Por favor, intenta más tarde.");
-                })
-                .map(response -> {
-                    try {
-                        JsonNode jsonNode = objectMapper.readValue(response, JsonNode.class);
-                        JsonNode contentNode = jsonNode.get("choices").get(0).get("message").get("content");
-                        String result = contentNode.isString() ? contentNode.getValue().toString() : "";
-                        log.info("Respuesta procesada de LMStudio: {}", result);
-                        return result;
-                    } catch (Exception e) {
-                        log.error("Error al procesar la respuesta de LM Studio", e);
-                        return "Error al procesar la respuesta";
-                    }
+                    log.error("Error al procesar texto con Ollama", e);
+                    return Flux.just("Lo siento, hubo un error al procesar tu solicitud.");
                 });
+    }
+
+    private String extractResponseContent(String jsonResponse) {
+        StringBuilder fullResponse = new StringBuilder();
+        try {
+            String[] jsonParts = jsonResponse.split("\n");
+            for (String part : jsonParts) {
+                if (!part.trim().isEmpty()) {
+                    JsonNode jsonNode = objectMapper.readValue(part, JsonNode.class);
+                    JsonNode responseNode = jsonNode.get("response");
+                    if (responseNode != null && responseNode.isString()) {
+                        fullResponse.append(responseNode.getStringValue());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error al extraer el contenido de la respuesta: {}", jsonResponse, e);
+        }
+        return fullResponse.toString();
     }
 
     public Flux<String> traducirConsulta(String consulta) {

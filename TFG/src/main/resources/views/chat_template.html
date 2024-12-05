@@ -115,59 +115,28 @@
             }
         })
             .then(response => {
-                console.log("Respuesta recibida:", response);
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let buffer = '';
+                let accumulatedResponse = '';
+                let responseUpdated = false;
 
-                function readChunk() {
-                    return reader.read().then(({ done, value }) => {
+                function readStream() {
+                    reader.read().then(({ done, value }) => {
                         if (done) {
-                            console.log("Stream completo");
-                            if (buffer) {
-                                processBuffer(buffer);
+                            if (!responseUpdated) {
+                                console.log("Respuesta completa recibida:", accumulatedResponse);
+                                updateLastMessage(accumulatedResponse.trim());
+                                responseUpdated = true;
                             }
                             return;
                         }
-
-                        const chunk = decoder.decode(value, { stream: true });
-                        console.log("Chunk recibido:", chunk);
-                        buffer += chunk;
-                        console.log("Buffer actual:", buffer);
-
-                        let newlineIndex;
-                        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-                            const line = buffer.slice(0, newlineIndex);
-                            buffer = buffer.slice(newlineIndex + 1);
-                            processBuffer(line);
-                        }
-
-                        return readChunk();
+                        const chunk = decoder.decode(value);
+                        accumulatedResponse += chunk;
+                        readStream();
                     });
                 }
 
-                function processBuffer(bufferContent) {
-                    console.log("Procesando buffer:", bufferContent);
-                    if (bufferContent.trim()) {
-                        try {
-                            const dataArray = JSON.parse(bufferContent);
-                            console.log("Datos recibidos:", dataArray);
-                            if (Array.isArray(dataArray)) {
-                                dataArray.forEach(data => {
-                                    if (data.respuesta && data.respuesta !== "Procesando mensaje...") {
-                                        updateLastMessage(data.respuesta);
-                                    }
-                                });
-                            } else if (dataArray.respuesta && dataArray.respuesta !== "Procesando mensaje...") {
-                                updateLastMessage(dataArray.respuesta);
-                            }
-                        } catch (error) {
-                            console.error('Error parsing JSON:', error, 'Content:', bufferContent);
-                        }
-                    }
-                }
-
-                return readChunk();
+                readStream();
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -190,19 +159,14 @@
     function updateLastMessage(message) {
         console.log("Actualizando último mensaje con:", message);
         var chatContainer = document.getElementById('chat-container');
-        var lastMessage = chatContainer.lastElementChild;
-        if (lastMessage && lastMessage.classList.contains('processing')) {
-            lastMessage.textContent = message;
-            lastMessage.classList.remove('processing');
+        var lastMessage = chatContainer.querySelector('.processing'); // Busca el último mensaje "procesando"
+        if (lastMessage) {
+            lastMessage.textContent = message; // Actualiza su contenido
+            lastMessage.classList.remove('processing'); // Quita la clase "processing"
         } else {
-            // Eliminar el mensaje "Procesando..." si existe
-            var processingMessage = chatContainer.querySelector('.processing');
-            if (processingMessage) {
-                chatContainer.removeChild(processingMessage);
-            }
-            addMessage(message, 'bot-message');
+            addMessage(message, 'bot-message'); // Si no hay ninguno, crea uno nuevo (debería ser raro)
         }
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        chatContainer.scrollTop = chatContainer.scrollHeight; // Asegura que el scroll esté al final
     }
 </script>
 </body>
