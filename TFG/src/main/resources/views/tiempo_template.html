@@ -105,7 +105,7 @@
 <script>
   function fetchWithRetry(url, options, maxRetries = 3) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 900000); // 15 minutos
+    const timeoutId = setTimeout(() => controller.abort(), 1800000); // 30 minutos
     options.signal = controller.signal;
 
     return fetch(url, options)
@@ -115,7 +115,7 @@
             })
             .catch(error => {
               clearTimeout(timeoutId);
-              if (maxRetries > 0) {
+              if (maxRetries > 0 && error.name !== 'AbortError') {
                 console.log(`Reintentando... Intentos restantes: ${maxRetries - 1}`);
                 return fetchWithRetry(url, options, maxRetries - 1);
               }
@@ -158,24 +158,8 @@
                   const chunk = decoder.decode(value, { stream: true });
                   console.log("Chunk recibido:", chunk);
                   buffer += chunk;
-                  console.log("Buffer actual:", buffer);
 
-                  let startIndex = 0;
-                  let endIndex;
-
-                  while ((endIndex = buffer.indexOf(']', startIndex)) !== -1) {
-                    const jsonString = buffer.substring(startIndex, endIndex + 1);
-                    try {
-                      const data = JSON.parse(jsonString);
-                      processBuffer(JSON.stringify(data));
-                      startIndex = endIndex + 1;
-                    } catch (error) {
-                      // Si no podemos parsear, probablemente no tenemos un JSON completo todavía
-                      break;
-                    }
-                  }
-
-                  buffer = buffer.slice(startIndex);
+                  processBuffer(buffer);
 
                   return readChunk();
                 });
@@ -183,26 +167,22 @@
 
               function processBuffer(bufferContent) {
                 console.log("Procesando buffer:", bufferContent);
-                if (bufferContent.trim()) {
+                let jsonStart = 0;
+                let jsonEnd = bufferContent.indexOf('}', jsonStart);
+
+                while (jsonEnd !== -1) {
                   try {
-                    const data = JSON.parse(bufferContent);
-                    console.log("Datos recibidos:", data);
-                    if (Array.isArray(data)) {
-                      // Si es un array, procesamos cada elemento
-                      data.forEach(item => {
-                        if (item.respuesta) {
-                          updateLastMessage(item.respuesta);
-                        }
-                      });
-                    } else if (data.respuesta) {
-                      // Si es un objeto individual
-                      updateLastMessage(data.respuesta);
-                    }
+                    const jsonString = bufferContent.slice(jsonStart, jsonEnd + 1);
+                    const data = JSON.parse(jsonString);
+                    updateLastMessage(data.respuesta);
+                    jsonStart = jsonEnd + 1;
+                    jsonEnd = bufferContent.indexOf('}', jsonStart);
                   } catch (error) {
-                    console.error('Error parsing JSON:', error, 'Content:', bufferContent);
-                    updateLastMessage("Error al procesar la respuesta del servidor");
+                    jsonEnd = bufferContent.indexOf('}', jsonEnd + 1);
                   }
                 }
+
+                buffer = bufferContent.slice(jsonStart);
               }
 
               return readChunk();

@@ -104,6 +104,10 @@
         e.preventDefault();
         var peticion = document.getElementById('peticion').value;
 
+        // Deshabilitar el botón de envío para evitar múltiples clics
+        var submitButton = this.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+
         addMessage(peticion, 'user-message');
         addMessage('Procesando...', 'bot-message processing');
 
@@ -115,63 +119,39 @@
             }
         })
             .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let buffer = '';
+                let accumulatedResponse = '';
 
-                function readChunk() {
-                    return reader.read().then(({ done, value }) => {
+                function readStream() {
+                    reader.read().then(({ done, value }) => {
                         if (done) {
-                            console.log("Stream completo");
-                            if (buffer) {
-                                processBuffer(buffer);
-                            }
+                            console.log("Respuesta completa:", accumulatedResponse);
+                            updateLastMessage(accumulatedResponse.trim());
+                            submitButton.disabled = false;  // Habilitar el botón de envío
                             return;
                         }
-
-                        const chunk = decoder.decode(value, { stream: true });
+                        const chunk = decoder.decode(value);
                         console.log("Chunk recibido:", chunk);
-                        buffer += chunk;
-                        console.log("Buffer actual:", buffer);
-
-                        let newlineIndex;
-                        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-                            const line = buffer.slice(0, newlineIndex);
-                            buffer = buffer.slice(newlineIndex + 1);
-                            processBuffer(line);
-                        }
-
-                        return readChunk();
+                        accumulatedResponse += chunk;
+                        updateLastMessage(accumulatedResponse);
+                        readStream();
+                    }).catch(error => {
+                        console.error("Error en la lectura del stream:", error);
+                        updateLastMessage("Error en la lectura de la respuesta.");
+                        submitButton.disabled = false;  // Habilitar el botón de envío
                     });
                 }
 
-                function processBuffer(bufferContent) {
-                    console.log("Procesando buffer:", bufferContent);
-                    if (bufferContent.trim()) {
-                        try {
-                            const data = JSON.parse(bufferContent);
-                            console.log("Datos recibidos:", data);
-                            if (Array.isArray(data)) {
-                                data.forEach(item => {
-                                    if (item.respuesta) {
-                                        updateLastMessage(item.respuesta);
-                                    }
-                                });
-                            } else if (data.respuesta) {
-                                updateLastMessage(data.respuesta);
-                            }
-                        } catch (error) {
-                            console.error('Error parsing JSON:', error, 'Content:', bufferContent);
-                            updateLastMessage("Error al procesar la respuesta del servidor");
-                        }
-                    }
-                }
-
-                return readChunk();
+                readStream();
             })
             .catch(error => {
                 console.error('Error:', error);
                 updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.');
+                submitButton.disabled = false;  // Habilitar el botón de envío
             });
 
         document.getElementById('peticion').value = '';
@@ -190,23 +170,12 @@
     function updateLastMessage(message) {
         console.log("Actualizando último mensaje con:", message);
         var chatContainer = document.getElementById('chat-container');
-        var lastMessage = chatContainer.lastElementChild;
-
-        // Reemplazar saltos de línea con <br>
-        message = message.replace(/\n/g, '<br>');
-
-        if (lastMessage && lastMessage.classList.contains('processing')) {
-            if (message === "Procesando petición...") {
-                lastMessage.textContent = message;
-            } else {
-                lastMessage.innerHTML = message;
-                lastMessage.classList.remove('processing');
-            }
+        var lastMessage = chatContainer.querySelector('.processing');
+        if (lastMessage) {
+            lastMessage.innerHTML = message.replace(/\n/g, '<br>');
+            lastMessage.classList.remove('processing');
         } else {
-            var messageElement = document.createElement('div');
-            messageElement.className = 'message bot-message';
-            messageElement.innerHTML = message;
-            chatContainer.appendChild(messageElement);
+            addMessage(message.replace(/\n/g, '<br>'), 'bot-message');
         }
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }

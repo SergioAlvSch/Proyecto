@@ -125,35 +125,18 @@
               }
               const reader = response.body.getReader();
               const decoder = new TextDecoder();
-              let buffer = '';
 
               function readChunk() {
                 return reader.read().then(({ done, value }) => {
                   if (done) {
                     console.log("Stream completo");
                     clearTimeout(timeoutId);
-                    if (buffer) {
-                      processBuffer(buffer);
-                    }
                     return;
                   }
 
                   const chunk = decoder.decode(value, { stream: true });
                   console.log("Chunk recibido:", chunk);
-                  buffer += chunk;
-                  console.log("Buffer actual:", buffer);
-
-                  while (true) {
-                    const jsonEndIndex = buffer.indexOf('}');
-                    if (jsonEndIndex === -1) break;
-
-                    const jsonStartIndex = buffer.lastIndexOf('{', jsonEndIndex);
-                    if (jsonStartIndex === -1) break;
-
-                    const jsonStr = buffer.slice(jsonStartIndex, jsonEndIndex + 1);
-                    buffer = buffer.slice(jsonEndIndex + 1);
-                    processBuffer(jsonStr);
-                  }
+                  processChunk(chunk);
 
                   return readChunk();
                 });
@@ -170,24 +153,20 @@
                 updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo más tarde.');
               }
             });
-
     document.getElementById('peticion').value = '';
   });
 
-  function processBuffer(bufferContent) {
-    console.log("Procesando buffer:", bufferContent);
-    if (bufferContent.trim()) {
+    function processChunk(chunk) {
       try {
-        const data = JSON.parse(bufferContent);
+        const data = JSON.parse(chunk);
         console.log("Datos recibidos:", data);
         if (data.respuesta && data.respuesta !== "Procesando petición...") {
           updateLastMessage(data.respuesta);
         }
       } catch (error) {
-        console.error('Error parsing JSON:', error, 'Content:', bufferContent);
+        console.error('Error parsing JSON:', error, 'Content:', chunk);
       }
     }
-  }
 
   function addMessage(message, className) {
     console.log("Añadiendo mensaje:", message, "Clase:", className);

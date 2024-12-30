@@ -50,19 +50,29 @@ public class LMStudioService {
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
 
+//        return Flux.from(httpClient.retrieve(request, String.class))
+//                .doOnNext(rawResponse -> log.info("Respuesta cruda recibida de Ollama: {}", rawResponse))
+//                .scan("", (acc, current) -> acc + current)
+//                .map(this::extractResponseContent)
+//                .filter(response -> !response.isEmpty())
+//                .distinctUntilChanged()
+//                .last()
+//                .flux() // Convierte Mono a Flux
+//                .doOnNext(response -> log.info("Contenido extraído final: {}", response))
+//                .doOnError(e -> log.error("Error en el flujo de procesamiento", e))
+//                .onErrorResume(e -> {
+//                    log.error("Error al procesar texto con Ollama", e);
+//                    return Flux.just("Lo siento, hubo un error al procesar tu solicitud.");
+//                });
         return Flux.from(httpClient.retrieve(request, String.class))
-                .scan("", (acc, current) -> acc + current)
+                .timeout(Duration.ofSeconds(600))
+                .doOnNext(rawResponse -> log.info("Respuesta cruda recibida de Ollama: {}", rawResponse))
                 .map(this::extractResponseContent)
                 .filter(response -> !response.isEmpty())
-                .distinctUntilChanged()
-                .last()
-                .flux() // Convierte Mono a Flux
-                .doOnNext(response -> log.info("Contenido extraído final: {}", response))
-                .onErrorResume(e -> {
-                    log.error("Error al procesar texto con Ollama", e);
-                    return Flux.just("Lo siento, hubo un error al procesar tu solicitud.");
-                });
+                .doOnError(e -> log.error("Error en procesarTexto", e))
+                .onErrorResume(e -> Flux.just("Error en procesamiento: " + e.getMessage()));
     }
+
 
     private String extractResponseContent(String jsonResponse) {
         StringBuilder fullResponse = new StringBuilder();
@@ -132,28 +142,25 @@ public class LMStudioService {
         return procesarTexto(prompt);
     }
 
-    public Flux<String> traducirRespuesta(String respuestaEnIngles) {
-        log.info("Iniciando traducción de respuesta");
-        String prompt = "Traduce la siguiente respuesta al español, manteniendo un tono amigable y conversacional. Mantén los saltos de línea originales. Responde SOLO con la traducción en español, sin incluir el texto original en inglés ni ninguna explicación adicional: '" + respuestaEnIngles + "'";
-        return procesarTexto(prompt)
-                .collectList()
-                .map(lista -> String.join("", lista))
-                .map(respuesta -> {
-                    int indexOfEnglish = respuesta.toLowerCase().indexOf("(friendly and conversational");
-                    if (indexOfEnglish != -1) {
-                        respuesta = respuesta.substring(0, indexOfEnglish).trim();
-                    }
-                    log.info("Traducción completada: {}", respuesta);
-                    return respuesta;
-                })
-                .flux();
-    }
-
     public Flux<String> procesarNoticias(List<SyndEntry> noticias) {
         String prompt = "Summarize the following 5 most recent news in English, leaving a line break between news:\n\n" +
-                noticias.stream().limit(5).map(entry -> entry.getTitle() + ": " + entry.getDescription().getValue())
-                        .collect(Collectors.joining("\n\n"));
-        return procesarTexto(prompt);
+                noticias.stream().limit(5).map(entry -> entry.getTitle());
+        log.info("Enviando prompt a Ollama para procesar noticias");
+        return procesarTexto(prompt)
+                .timeout(Duration.ofSeconds(600))
+                .doOnNext(response -> log.info("Respuesta recibida de Ollama para noticias: {}", response))
+                .doOnError(e -> log.error("Error al procesar noticias con Ollama", e))
+                .onErrorResume(e -> Flux.just("Error al procesar noticias: " + e.getMessage()));
+    }
+
+    public Flux<String> traducirRespuesta(String respuestaEnIngles) {
+        log.info("Iniciando traducción de respuesta");
+        String prompt = "Traduce la siguiente respuesta al español, manteniendo un tono amigable y conversacional: '" + respuestaEnIngles + "'";
+        return procesarTexto(prompt)
+                .timeout(Duration.ofSeconds(600))
+                .doOnNext(traduccion -> log.info("Traducción completada: {}", traduccion))
+                .doOnError(e -> log.error("Error al traducir respuesta", e))
+                .onErrorResume(e -> Flux.just("Error al traducir: " + e.getMessage()));
     }
 
     public Flux<Map<String, String>> extraerInformacionViaje(String consulta) {

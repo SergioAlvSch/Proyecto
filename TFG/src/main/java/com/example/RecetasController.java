@@ -40,7 +40,7 @@ public class RecetasController {
 
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_EVENT_STREAM)
     public Flux<String> procesarPeticionReceta(@Body Map<String, String> peticion) {
         String texto = peticion.get("texto");
         log.info("Recibida solicitud de receta: {}", texto);
@@ -56,8 +56,8 @@ public class RecetasController {
                         )
         ).onErrorResume(e -> {
             log.error("Error al procesar la petición de receta: ", e);
-            return Flux.just(crearRespuestaError(texto, e).toString());
-        }).timeout(Duration.ofMinutes(30));
+            return Flux.just(crearRespuestaError(texto, e));
+        });
     }
 
     private Flux<String> procesarConsultaSegunTipo(String tipo, String consultaTraducida) {
@@ -105,9 +105,7 @@ public class RecetasController {
         Map<String, String> respuesta = new HashMap<>();
         respuesta.put("respuesta", mensaje);
         try {
-            String jsonRespuesta = objectMapper.writeValueAsString(respuesta);
-            log.info("Emitiendo respuesta JSON: {}", jsonRespuesta);
-            return Flux.just(jsonRespuesta);
+            return Flux.just(objectMapper.writeValueAsString(respuesta));
         } catch (JsonProcessingException e) {
             log.error("Error al serializar la respuesta", e);
             return Flux.error(e);
@@ -116,10 +114,17 @@ public class RecetasController {
         }
     }
 
-    private Map<String, String> crearRespuestaError(String textoOriginal, Throwable e) {
+    private String crearRespuestaError(String textoOriginal, Throwable e) {
         Map<String, String> error = new HashMap<>();
         error.put("peticion", textoOriginal);
         error.put("respuesta", "Error: " + e.getMessage());
-        return error;
+        try {
+            return objectMapper.writeValueAsString(error);
+        } catch (JsonProcessingException ex) {
+            log.error("Error al serializar el error", ex);
+            return "{\"respuesta\": \"Error interno del servidor\"}";
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 }

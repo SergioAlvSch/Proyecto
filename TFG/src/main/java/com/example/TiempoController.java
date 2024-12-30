@@ -40,52 +40,37 @@ public class TiempoController {
     public Flux<String> procesarConsultaTiempo(@Body Map<String, String> peticion) {
         String texto = peticion.get("texto");
         log.info("Recibida solicitud de tiempo: {}", texto);
+
         return Flux.concat(
                         emitirRespuesta("Procesando petición..."),
                         lmStudioService.extraerInformacionViaje(texto)
                                 .flatMap(infoViaje -> {
                                     log.info("Información de viaje extraída: {}", infoViaje);
-                                    int diasTotales = Integer.parseInt(infoViaje.get("diasHastaViaje")) +
-                                            Integer.parseInt(infoViaje.get("duracionViaje"));
-                                    return emitirRespuesta("Obteniendo pronóstico...")
-                                            .concatWith(weatherService.obtenerPronostico(
-                                                            infoViaje.get("destino"),
-                                                            diasTotales
-                                                    )
-                                                    .flatMap(pronostico -> {
-                                                        try {
-                                                            String pronosticoJson = objectMapper.writeValueAsString(pronostico);
-                                                            int diasPronosticados = (int) pronostico.get("diasPronosticados");
-                                                            return emitirRespuesta(pronosticoJson)
-                                                                    .concatWith(lmStudioService.generarConsejoRopa(
-                                                                            pronosticoJson,
-                                                                            diasPronosticados,
-                                                                            diasTotales,
-                                                                            infoViaje.get("destino")
-                                                                    ));
-                                                        } catch (JsonProcessingException e) {
-                                                            log.error("Error al serializar el pronóstico", e);
-                                                            return Flux.just("Error al procesar el pronóstico");
-                                                        } catch (IOException e) {
-                                                            throw new RuntimeException(e);
-                                                        }
-                                                    }));
+                                    int diasTotales = Integer.parseInt(infoViaje.getOrDefault("diasHastaViaje", "0")) +
+                                            Integer.parseInt(infoViaje.getOrDefault("duracionViaje", "0"));
+                                    return weatherService.obtenerPronostico(infoViaje.get("destino"), diasTotales)
+                                            .flatMap(pronostico -> {
+                                                try {
+                                                    String pronosticoJson = objectMapper.writeValueAsString(pronostico);
+                                                    int diasPronosticados = (int) pronostico.getOrDefault("diasPronosticados", 0);
+                                                    return lmStudioService.generarConsejoRopa(pronosticoJson, diasPronosticados, diasTotales, infoViaje.get("destino"));
+                                                } catch (JsonProcessingException e) {
+                                                    return Flux.error(e);
+                                                } catch (IOException e) {
+                                                    throw new RuntimeException(e);
+                                                }
+                                            });
                                 })
-                                .flatMap(consejoEnIngles -> {
-                                    log.info("Consejo generado en inglés: {}", consejoEnIngles);
-                                    return emitirRespuesta("Traduciendo respuesta...")
-                                            .concatWith(lmStudioService.traducirRespuesta(consejoEnIngles));
-                                })
-                                .flatMap(consejoTraducido -> {
-                                    log.info("Consejo traducido: {}", consejoTraducido);
-                                    return emitirRespuesta(consejoTraducido);
-                                })
-                ).timeout(Duration.ofMinutes(20))
+                                .flatMap(consejoEnIngles -> lmStudioService.traducirRespuesta(consejoEnIngles))
+                                .flatMap(this::emitirRespuesta)
+                )
+                .timeout(Duration.ofMinutes(30))
                 .onErrorResume(e -> {
                     log.error("Error al procesar la consulta de tiempo: ", e);
                     return Flux.just(crearRespuestaError(texto, e));
                 });
     }
+
 
     private Flux<String> emitirRespuesta(String mensaje) {
         Map<String, String> respuesta = new HashMap<>();
