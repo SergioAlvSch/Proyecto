@@ -143,8 +143,8 @@ public class LMStudioService {
     }
 
     public Flux<String> procesarNoticias(List<SyndEntry> noticias) {
-        String prompt = "Summarize the following 5 most recent news in English, leaving a line break between news:\n\n" +
-                noticias.stream().limit(5).map(entry -> entry.getTitle());
+        String prompt = "Summarize these specific news articles in English, maintaining their original content and source:\n\n" +
+                noticias.stream().limit(5).map(entry -> entry.getTitle() + ": " + entry.getDescription()).collect(Collectors.joining("\n\n"));
         log.info("Enviando prompt a Ollama para procesar noticias");
         return procesarTexto(prompt)
                 .timeout(Duration.ofSeconds(600))
