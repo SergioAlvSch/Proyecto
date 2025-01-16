@@ -50,20 +50,6 @@ public class LMStudioService {
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
 
-//        return Flux.from(httpClient.retrieve(request, String.class))
-//                .doOnNext(rawResponse -> log.info("Respuesta cruda recibida de Ollama: {}", rawResponse))
-//                .scan("", (acc, current) -> acc + current)
-//                .map(this::extractResponseContent)
-//                .filter(response -> !response.isEmpty())
-//                .distinctUntilChanged()
-//                .last()
-//                .flux() // Convierte Mono a Flux
-//                .doOnNext(response -> log.info("Contenido extraído final: {}", response))
-//                .doOnError(e -> log.error("Error en el flujo de procesamiento", e))
-//                .onErrorResume(e -> {
-//                    log.error("Error al procesar texto con Ollama", e);
-//                    return Flux.just("Lo siento, hubo un error al procesar tu solicitud.");
-//                });
         return Flux.from(httpClient.retrieve(request, String.class))
                 .timeout(Duration.ofSeconds(600))
                 .doOnNext(rawResponse -> log.info("Respuesta cruda recibida de Ollama: {}", rawResponse))
@@ -143,14 +129,61 @@ public class LMStudioService {
     }
 
     public Flux<String> procesarNoticias(List<SyndEntry> noticias) {
-        String prompt = "Summarize these specific news articles in English, maintaining their original content and source:\n\n" +
-                noticias.stream().limit(5).map(entry -> entry.getTitle() + ": " + entry.getDescription()).collect(Collectors.joining("\n\n"));
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+        String prompt = "Summarize these specific news articles in English, maintaining their original content and source. Include the date at the beginning and the link at the end of each summary:\n\n" +
+                noticias.stream().limit(5).map(entry -> {
+                    String date = dateFormat.format(entry.getPublishedDate());
+                    String title = entry.getTitle();
+                    String description = entry.getDescription().getValue();
+                    String link = entry.getLink();
+                    return String.format("[%s] %s: %s (%s)", date, title, description, link);
+                }).collect(Collectors.joining("\n\n")) +
+                "\n\nProvide a summary for each news item, keeping the date at the beginning and the link at the end in parentheses.";
+
         log.info("Enviando prompt a Ollama para procesar noticias");
         return procesarTexto(prompt)
                 .timeout(Duration.ofSeconds(600))
-                .doOnNext(response -> log.info("Respuesta recibida de Ollama para noticias: {}", response))
+                .map(this::formatearRespuestaNoticias)
+                .doOnNext(response -> log.info("Respuesta formateada de Ollama para noticias: {}", response))
                 .doOnError(e -> log.error("Error al procesar noticias con Ollama", e))
                 .onErrorResume(e -> Flux.just("Error al procesar noticias: " + e.getMessage()));
+    }
+
+    private String formatearRespuestaNoticias(String respuesta) {
+        String[] noticias = respuesta.split("\n\n");
+        StringBuilder resultado = new StringBuilder();
+        for (String noticia : noticias) {
+            String fechaFormateada = extraerFecha(noticia);
+            String enlaceFormateado = extraerEnlace(noticia);
+            String contenido = noticia.replaceAll("\\[.*?\\]", "").replaceAll("\\(http.*?\\)", "").trim();
+            resultado.append(fechaFormateada).append("\n")
+                    .append(contenido).append("\n")
+                    .append(enlaceFormateado).append("\n\n");
+        }
+        return resultado.toString().trim();
+    }
+
+    private String extraerFecha(String noticia) {
+        Pattern pattern = Pattern.compile("\\[(\\d{2}/\\d{2}/\\d{4})\\]");
+        Matcher matcher = pattern.matcher(noticia);
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private String extraerEnlace(String noticia) {
+        Pattern pattern = Pattern.compile("\\((https.*?)\\)");
+        Matcher matcher = pattern.matcher(noticia);
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    public Flux<String> traducirNoticias(String resumenEnIngles) {
+        log.info("Iniciando traducción de noticias");
+        String prompt = "Translate the following news summary from English to Spanish. Keep the original formatting, including dates, links, and paragraph structure. Don't add additional information or change the tone. It literally translates:\n\n" + resumenEnIngles;
+
+        return procesarTexto(prompt)
+                .timeout(Duration.ofSeconds(600))
+                .doOnNext(traduccion -> log.info("Traducción de noticias completada: {}", traduccion))
+                .doOnError(e -> log.error("Error al traducir noticias", e))
+                .onErrorResume(e -> Flux.just("Error al traducir: " + e.getMessage()));
     }
 
     public Flux<String> traducirRespuesta(String respuestaEnIngles) {

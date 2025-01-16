@@ -44,39 +44,14 @@ public class NoticiasController {
 
         return Flux.defer(() -> rssReaderService.readRssFeed(feedUrl)
                         .flatMap(noticias -> lmStudioService.procesarNoticias(noticias))
-                        .flatMap(resumenEnIngles -> lmStudioService.traducirRespuesta(resumenEnIngles))
+                        .flatMap(resumenEnIngles -> lmStudioService.traducirNoticias(resumenEnIngles))
                         .defaultIfEmpty("No se encontraron noticias para procesar.")
                         .doOnNext(respuesta -> log.info("Respuesta final: {}", respuesta))
                         .onErrorResume(e -> {
                             log.error("Error al obtener noticias: ", e);
                             return Flux.just("Error: " + e.getMessage());
                         }))
-                .subscribeOn(Schedulers.boundedElastic());
+                .subscribeOn(Schedulers.boundedElastic())
+                .take(1);   // Toma solo la primera respuesta
     }
 }
-
-
-//    private Flux<String> emitirRespuesta(String mensaje) {
-//        Map<String, String> respuesta = new HashMap<>();
-//        respuesta.put("respuesta", mensaje);
-//        try {
-//            return Flux.just(objectMapper.writeValueAsString(respuesta));
-//        } catch (IOException e) {
-//            log.error("Error al serializar la respuesta", e);
-//            return Flux.error(e);
-//        }
-//    }
-//
-//    private String crearRespuestaError(String textoOriginal, Throwable e) {
-//        Map<String, String> error = new HashMap<>();
-//        error.put("peticion", textoOriginal);
-//        error.put("respuesta", "Error: " + e.getMessage());
-//        try {
-//            return objectMapper.writeValueAsString(error);
-//        } catch (JsonProcessingException jpe) {
-//            log.error("Error al serializar respuesta de error", jpe);
-//            return "{\"respuesta\": \"Error interno del servidor\"}";
-//        } catch (IOException ex) {
-//            throw new RuntimeException(ex);
-//        }
-//    }

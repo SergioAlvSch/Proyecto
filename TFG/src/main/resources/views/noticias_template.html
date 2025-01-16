@@ -104,7 +104,6 @@
         e.preventDefault();
         var peticion = document.getElementById('peticion').value;
 
-        // Deshabilitar el botón de envío para evitar múltiples clics
         var submitButton = this.querySelector('button[type="submit"]');
         submitButton.disabled = true;
 
@@ -122,36 +121,17 @@
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let accumulatedResponse = '';
-
-                function readStream() {
-                    reader.read().then(({ done, value }) => {
-                        if (done) {
-                            console.log("Respuesta completa:", accumulatedResponse);
-                            updateLastMessage(accumulatedResponse.trim());
-                            submitButton.disabled = false;  // Habilitar el botón de envío
-                            return;
-                        }
-                        const chunk = decoder.decode(value);
-                        console.log("Chunk recibido:", chunk);
-                        accumulatedResponse += chunk;
-                        updateLastMessage(accumulatedResponse);
-                        readStream();
-                    }).catch(error => {
-                        console.error("Error en la lectura del stream:", error);
-                        updateLastMessage("Error en la lectura de la respuesta.");
-                        submitButton.disabled = false;  // Habilitar el botón de envío
-                    });
-                }
-
-                readStream();
+                return response.text(); // Cambiamos a text() en lugar de usar un reader
+            })
+            .then(text => {
+                console.log("Respuesta completa:", text);
+                updateLastMessage(text.trim());
+                submitButton.disabled = false;
             })
             .catch(error => {
                 console.error('Error:', error);
                 updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.');
-                submitButton.disabled = false;  // Habilitar el botón de envío
+                submitButton.disabled = false;
             });
 
         document.getElementById('peticion').value = '';
@@ -172,10 +152,10 @@
         var chatContainer = document.getElementById('chat-container');
         var lastMessage = chatContainer.querySelector('.processing');
         if (lastMessage) {
-            lastMessage.innerHTML = message.replace(/\n/g, '<br>');
+            lastMessage.innerHTML = message.replace(/\n/g, '<br>').replace(/\((https[^)]+)\)/g, '(<a href="$1" target="_blank">$1</a>)');
             lastMessage.classList.remove('processing');
         } else {
-            addMessage(message.replace(/\n/g, '<br>'), 'bot-message');
+            addMessage(message.replace(/\n/g, '<br>').replace(/\((https[^)]+)\)/g, '(<a href="$1" target="_blank">$1</a>)'), 'bot-message');
         }
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
