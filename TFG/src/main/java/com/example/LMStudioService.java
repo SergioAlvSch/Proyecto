@@ -33,7 +33,7 @@ public class LMStudioService {
     private final Runtime runtime;
 
     @Inject
-    @Client("http://localhost:11434")
+    @Client("http://ollama:11434")
     HttpClient httpClient;
 
     public LMStudioService(ObjectMapper objectMapper) {
@@ -45,7 +45,7 @@ public class LMStudioService {
         log.info("Enviando prompt a Ollama: {}", prompt);
 
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "llama2");
+        requestBody.put("model", "deepseek-r1");
         requestBody.put("prompt", prompt);
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
