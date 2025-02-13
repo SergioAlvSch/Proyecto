@@ -7,47 +7,109 @@
   <style>
     body {
       font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
       display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #f0f0f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    header img {
+      max-height: 50px;
+      vertical-align: middle;
+    }
+
+    header h1 {
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 24px;
+      vertical-align: middle;
+    }
+
+    .container {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      margin: 0;
-      background-color: #f0f0f0;
+      padding: 20px;
+      box-sizing: border-box;
     }
-    .container {
-      text-align: center;
-      background-color: white;
-      padding: 2rem;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+    .grid-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      max-width: 600px;
+      width: 100%;
     }
-    h1 {
-      color: #333;
-      margin-bottom: 2rem;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin: 10px;
-      cursor: pointer;
+
+    .grid-button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
       background-color: #4CAF50;
       color: white;
       border: none;
-      border-radius: 5px;
+      border-radius: 10px;
+      cursor: pointer;
       transition: background-color 0.3s;
+      text-decoration: none;
     }
-    button:hover {
+
+    .grid-button:hover {
       background-color: #45a049;
+    }
+
+    .grid-button img {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 10px;
+    }
+
+    .grid-button span {
+      font-size: 16px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
+<header>
+  <img src="" alt="Logo de la Aplicación">
+  <h1>Nombre de la Aplicación</h1>
+</header>
+
 <div class="container">
-  <h1>Bienvenido a la Aplicación</h1>
-  <button onclick="location.href='/recetas'">Buscar Recetas</button>
-  <button onclick="location.href='/noticias'">Leer Noticias</button>
-  <button onclick="location.href='/tiempo'">Consultar Tiempo</button>
-  <button onclick="location.href='/chat'">Chat con LMStudio</button>
+  <div class="grid-buttons">
+    <a href="/recetas" class="grid-button">
+      <img src="" alt="Icono Recetas">
+      <span>Buscar Recetas</span>
+    </a>
+    <a href="/noticias" class="grid-button">
+      <img src="" alt="Icono Noticias">
+      <span>Leer Noticias</span>
+    </a>
+    <a href="/tiempo" class="grid-button">
+      <img src="" alt="Icono Tiempo">
+      <span>Consultar Tiempo</span>
+    </a>
+    <a href="/chat" class="grid-button">
+      <img src="" alt="Icono Chat">
+      <span>Chat con IA</span>
+    </a>
+  </div>
 </div>
 </body>
 </html>

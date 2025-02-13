@@ -7,18 +7,36 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             background-color: #f0f0f0;
         }
-        h1 {
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
             text-align: center;
-            margin-bottom: 20px;
-            color: #333;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        header img {
+            max-height: 50px;
+            vertical-align: middle;
+        }
+        header h1 {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 24px;
+            vertical-align: middle;
+        }
+        .content{
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
         }
         .nav-buttons {
             margin-bottom: 20px;
@@ -86,18 +104,23 @@
     </style>
 </head>
 <body>
-<h1>Chat con LMStudio</h1>
-<div class="nav-buttons">
-    <button class="nav-button" onclick="window.location.href='/'">Menú Principal</button>
-    <button class="nav-button" onclick="window.location.href='/recetas'">Recetas</button>
-    <button class="nav-button" onclick="window.location.href='/noticias'">Noticias</button>
-    <button class="nav-button" onclick="window.location.href='/tiempo'">Tiempo</button>
-</div>
+<header>
+    <img src="" alt="Logo de la Aplicación">
+    <h1>Chat con IA</h1>
+    <div class="nav-buttons">
+        <button class="nav-button" onclick="window.location.href='/'">Menú Principal</button>
+        <button class="nav-button" onclick="window.location.href='/recetas'">Recetas</button>
+        <button class="nav-button" onclick="window.location.href='/noticias'">Noticias</button>
+        <button class="nav-button" onclick="window.location.href='/tiempo'">Tiempo</button>
+    </div>
+</header>
+<div class="content">
 <form id="chatForm">
     <input type="text" id="mensaje" placeholder="Escribe tu mensaje aquí" required>
     <button type="submit" class="submit-button">Enviar</button>
 </form>
-<div id="chat-container"></div>
+    <div id="chat-container"></div>
+</div>
 
 <script>
     document.getElementById('chatForm').addEventListener('submit', function(e) {
