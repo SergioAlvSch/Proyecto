@@ -1,0 +1,6 @@
+micronaut:
+  router:
+    static-resources:
+      images:
+        paths: classpath:static/images
+        mapping: /images/**

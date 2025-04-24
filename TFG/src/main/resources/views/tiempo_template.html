@@ -104,6 +104,35 @@
     .submit-button:hover {
       background-color: #45a049;
     }
+    .results-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    .result-box {
+      width: 48%;
+      border: 1px solid #ddd;
+      padding: 10px;
+      background-color: white;
+      border-radius: 5px;
+      height: 400px;
+      overflow-y: auto;
+    }
+
+    .result-box h3 {
+      margin-top: 0;
+      color: #4CAF50;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    #pronostico-content {
+      font-family: monospace;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -118,104 +147,45 @@
   </div>
 </header>
 <div class="content">
-<form id="peticionForm">
-  <input type="text" id="peticion" placeholder="Escribe tu consulta sobre el tiempo" required>
-  <button type="submit" class="submit-button">Enviar</button>
-</form>
-<div id="chat-container"></div>
+  <form id="peticionForm">
+    <input type="text" id="peticion" placeholder="Escribe tu consulta sobre el tiempo" required>
+    <button type="submit" class="submit-button">Enviar</button>
+  </form>
+  <div class="results-container">
+    <div id="pronostico-container" class="result-box">
+      <h3>Pronóstico del Tiempo</h3>
+      <pre id="pronostico-content"></pre>
+    </div>
+    <div id="consejo-container" class="result-box">
+      <h3>Consejo de Ropa</h3>
+      <pre id="consejo-content"></pre>
+    </div>
+  </div>
 </div>
 <script>
-  function fetchWithRetry(url, options, maxRetries = 3) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1800000); // 30 minutos
-    options.signal = controller.signal;
-
-    return fetch(url, options)
-            .then(response => {
-              clearTimeout(timeoutId);
-              return response;
-            })
-            .catch(error => {
-              clearTimeout(timeoutId);
-              if (maxRetries > 0 && error.name !== 'AbortError') {
-                console.log(`Reintentando... Intentos restantes: ${maxRetries - 1}`);
-                return fetchWithRetry(url, options, maxRetries - 1);
-              }
-              throw error;
-            });
-  }
-
   document.getElementById('peticionForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    var peticion = document.getElementById('peticion').value;
+    const peticion = document.getElementById('peticion').value;
+    const pronosticoContent = document.getElementById('pronostico-content');
+    const consejoContent = document.getElementById('consejo-content');
 
-    addMessage(peticion, 'user-message');
-    addMessage('Procesando...', 'bot-message processing');
+    pronosticoContent.textContent = 'Obteniendo pronóstico...';
+    consejoContent.textContent = 'Generando recomendaciones...';
 
-    fetchWithRetry('/tiempo/procesar', {
+    fetch('/tiempo/procesar', {
       method: 'POST',
       body: JSON.stringify({ texto: peticion }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Content-Type': 'application/json' }
     })
-            .then(response => {
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              const reader = response.body.getReader();
-              const decoder = new TextDecoder();
-              let buffer = '';
-
-              function readChunk() {
-                return reader.read().then(({ done, value }) => {
-                  if (done) {
-                    console.log("Stream completo");
-                    if (buffer) {
-                      processBuffer(buffer);
-                    }
-                    return;
-                  }
-
-                  const chunk = decoder.decode(value, { stream: true });
-                  console.log("Chunk recibido:", chunk);
-                  buffer += chunk;
-
-                  processBuffer(buffer);
-
-                  return readChunk();
-                });
-              }
-
-              function processBuffer(bufferContent) {
-                console.log("Procesando buffer:", bufferContent);
-                let jsonStart = 0;
-                let jsonEnd = bufferContent.indexOf('}', jsonStart);
-
-                while (jsonEnd !== -1) {
-                  try {
-                    const jsonString = bufferContent.slice(jsonStart, jsonEnd + 1);
-                    const data = JSON.parse(jsonString);
-                    updateLastMessage(data.respuesta);
-                    jsonStart = jsonEnd + 1;
-                    jsonEnd = bufferContent.indexOf('}', jsonStart);
-                  } catch (error) {
-                    jsonEnd = bufferContent.indexOf('}', jsonEnd + 1);
-                  }
-                }
-
-                buffer = bufferContent.slice(jsonStart);
-              }
-
-              return readChunk();
+            .then(response => response.json())
+            .then(data => {
+              pronosticoContent.textContent = JSON.stringify(data.pronostico, null, 2) || 'No hay datos disponibles';
+              consejoContent.textContent = data.consejo || 'No hay recomendaciones disponibles';
             })
             .catch(error => {
               console.error('Error:', error);
-              if (error.name === 'AbortError') {
-                updateLastMessage('La solicitud ha tardado demasiado. Por favor, intenta de nuevo.');
-              } else {
-                updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo más tarde.');
-              }
+              pronosticoContent.textContent = 'Error al obtener el pronóstico';
+              consejoContent.textContent = 'Error al generar recomendaciones';
             });
 
     document.getElementById('peticion').value = '';

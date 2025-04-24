@@ -36,68 +36,65 @@ public class TiempoController {
 
     @Post("/procesar")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_EVENT_STREAM)
     public Flux<String> procesarConsultaTiempo(@Body Map<String, String> peticion) {
         String texto = peticion.get("texto");
         log.info("Recibida solicitud de tiempo: {}", texto);
 
-        return Flux.concat(
-                        emitirRespuesta("Procesando petición..."),
-                        lmStudioService.extraerInformacionViaje(texto)
-                                .flatMap(infoViaje -> {
-                                    log.info("Información de viaje extraída: {}", infoViaje);
-                                    int diasTotales = Integer.parseInt(infoViaje.getOrDefault("diasHastaViaje", "0")) +
-                                            Integer.parseInt(infoViaje.getOrDefault("duracionViaje", "0"));
-                                    return weatherService.obtenerPronostico(infoViaje.get("destino"), diasTotales)
-                                            .flatMap(pronostico -> {
-                                                try {
-                                                    String pronosticoJson = objectMapper.writeValueAsString(pronostico);
-                                                    int diasPronosticados = (int) pronostico.getOrDefault("diasPronosticados", 0);
-                                                    return lmStudioService.generarConsejoRopa(pronosticoJson, diasPronosticados, diasTotales, infoViaje.get("destino"));
-                                                } catch (JsonProcessingException e) {
-                                                    return Flux.error(e);
-                                                } catch (IOException e) {
-                                                    throw new RuntimeException(e);
-                                                }
-                                            });
-                                })
-                                .flatMap(consejoEnIngles -> lmStudioService.traducirRespuesta(consejoEnIngles))
-                                .flatMap(this::emitirRespuesta)
-                )
-                .timeout(Duration.ofMinutes(30))
-                .onErrorResume(e -> {
-                    log.error("Error al procesar la consulta de tiempo: ", e);
-                    return Flux.just(crearRespuestaError(texto, e));
-                });
+        return lmStudioService.extraerInformacionViaje(texto)
+                .flatMap(infoViaje -> {
+                    if (infoViaje.containsKey("error")) {
+                        return Flux.just(crearJson("error", infoViaje.get("error")));
+                    }
+
+                    int diasTotales = Integer.parseInt(infoViaje.getOrDefault("duracionViaje", "0"));
+                    return weatherService.obtenerPronostico(infoViaje.get("destino"), diasTotales)
+                            .flatMap(pronostico -> lmStudioService.generarConsejoRopa(
+                                            pronostico.toString(),
+                                            ((Number) pronostico.get("diasPronosticados")).intValue(),
+                                            diasTotales,
+                                            infoViaje.get("destino"))
+                                    .map(consejo -> crearJsonCompleto(pronostico, consejo)));
+                })
+                .onErrorResume(e -> Flux.just(crearJson("error", "Error: " + e.getMessage())));
     }
 
-
-    private Flux<String> emitirRespuesta(String mensaje) {
-        Map<String, String> respuesta = new HashMap<>();
-        respuesta.put("respuesta", mensaje);
+    private String crearJsonCompleto(Object pronostico, String consejo) {
+        Map<String, Object> resultado = new HashMap<>();
+        resultado.put("pronostico", pronostico);
+        resultado.put("consejo", consejo);
         try {
-            String jsonRespuesta = objectMapper.writeValueAsString(respuesta);
-            log.info("Emitiendo respuesta JSON: {}", jsonRespuesta);
-            return Flux.just(jsonRespuesta);
+            return objectMapper.writeValueAsString(resultado);
         } catch (JsonProcessingException e) {
-            log.error("Error al serializar la respuesta", e);
-            return Flux.error(e);
+            log.error("Error al serializar el resultado", e);
+            return "{\"error\": \"Error al procesar el tiempo\"}";
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private String crearRespuestaError(String textoOriginal, Throwable e) {
+    private String crearJson(String tipo, String contenido) {
+        Map<String, String> resultado = new HashMap<>();
+        resultado.put(tipo, contenido);
+        try {
+            return objectMapper.writeValueAsString(resultado);
+        } catch (JsonProcessingException e) {
+            log.error("Error al serializar el resultado", e);
+            return "{\"error\": \"Error al procesar la respuesta\"}";
+        } catch (IOException e) {
+            throw new RuntimeException("Error de E/S", e);
+        }
+    }
+}
+    /*private String crearRespuestaError(String textoOriginal, Throwable e) {
         Map<String, String> error = new HashMap<>();
-        error.put("peticion", textoOriginal);
-        error.put("respuesta", "Error: " + e.getMessage());
+        error.put("error", e.getMessage());
         try {
             return objectMapper.writeValueAsString(error);
         } catch (JsonProcessingException jpe) {
             log.error("Error al serializar respuesta de error", jpe);
-            return "{\"respuesta\": \"Error interno del servidor\"}";
+            return "{\"error\": \"Error interno del servidor\"}";
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-    }
-}
+    }*/

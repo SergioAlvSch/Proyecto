@@ -1,11 +1,11 @@
 package com.example;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.rometools.rome.feed.synd.SyndEntry;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.serde.ObjectMapper;
 import jakarta.inject.Inject;
@@ -13,15 +13,10 @@ import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -33,7 +28,9 @@ public class LMStudioService {
     private final Runtime runtime;
 
     @Inject
-    @Client("http://ollama:11434")
+    @Client("http://localhost:11434")
+    //@Client("http://ollama:11434") //deepseek-r1
+    //@Client("http://ollama2:11434") //llama2
     HttpClient httpClient;
 
     public LMStudioService(ObjectMapper objectMapper) {
@@ -45,22 +42,25 @@ public class LMStudioService {
         log.info("Enviando prompt a Ollama: {}", prompt);
 
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "deepseek-r1");
+        //requestBody.put("model", "llama2");
+        //requestBody.put("model", "deepseek-r1");
+        requestBody.put("model", "llama3.2:3b-instruct-q8_0");
         requestBody.put("prompt", prompt);
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
 
         return Flux.from(httpClient.retrieve(request, String.class))
-                .timeout(Duration.ofSeconds(600))
+                .timeout(Duration.ofMinutes(30))
                 .doOnNext(rawResponse -> log.info("Respuesta cruda recibida de Ollama: {}", rawResponse))
                 .map(this::extractResponseContent)
+                .map(this::limpiarRespuesta)
                 .filter(response -> !response.isEmpty())
                 .doOnError(e -> log.error("Error en procesarTexto", e))
                 .onErrorResume(e -> Flux.just("Error en procesamiento: " + e.getMessage()));
     }
 
-
     private String extractResponseContent(String jsonResponse) {
+
         StringBuilder fullResponse = new StringBuilder();
         try {
             String[] jsonParts = jsonResponse.split("\n");
@@ -69,7 +69,8 @@ public class LMStudioService {
                     JsonNode jsonNode = objectMapper.readValue(part, JsonNode.class);
                     JsonNode responseNode = jsonNode.get("response");
                     if (responseNode != null && responseNode.isString()) {
-                        fullResponse.append(responseNode.getStringValue());
+                        String response = responseNode.getStringValue();
+                        fullResponse.append(response);
                     }
                 }
             }
@@ -77,6 +78,16 @@ public class LMStudioService {
             log.error("Error al extraer el contenido de la respuesta: {}", jsonResponse, e);
         }
         return fullResponse.toString();
+    }
+
+    private String limpiarRespuesta(String respuesta) {
+        // Eliminar el contenido entre <think> y </think>
+        respuesta = respuesta.replaceAll("(?s)<think>.*?</think>", "");
+        // Eliminar cualquier etiqueta HTML restante
+        respuesta = respuesta.replaceAll("<[^>]*>", "");
+        // Reemplazar múltiples espacios en blanco por uno solo, pero mantener los saltos de línea
+        respuesta = respuesta.replaceAll("(?m)^\\s+", "").replaceAll("\\s+$", "").replaceAll("\\s{2,}", " ");
+        return respuesta.trim();
     }
 
     public Flux<String> traducirConsulta(String consulta) {
@@ -93,10 +104,9 @@ public class LMStudioService {
                 "Responde SOLO con el número correspondiente (1 o 2).";
         return procesarTexto(prompt)
                 .map(respuesta -> {
-                    // Extraer solo el primer número (1 o 2) de la respuesta
                     Pattern pattern = Pattern.compile("\\b[12]\\b");
                     Matcher matcher = pattern.matcher(respuesta);
-                    return matcher.find() ? matcher.group() : "0"; // Devuelve "0" si no se encuentra 1 o 2
+                    return matcher.find() ? matcher.group() : "0";
                 });
     }
 
@@ -210,13 +220,23 @@ public class LMStudioService {
 
         return procesarTexto(prompt)
                 .map(respuesta -> {
+                    // Limpieza estricta de la respuesta
+                    String cleanedResponse = respuesta.replaceAll("[^\\{\\}\"':,\\d\\w\\s]", "").trim();
                     try {
-                        Map<String, String> info = objectMapper.readValue(respuesta,
+                        // Intenta parsear la respuesta como JSON
+                        Map<String, String> info = objectMapper.readValue(cleanedResponse,
                                 Argument.mapOf(Argument.STRING, Argument.STRING));
 
                         validarYCompletarInformacionViaje(info, fechaActual);
 
                         return info;
+                    } catch (JsonSyntaxException e) {
+                        log.error("Error de sintaxis JSON al procesar la respuesta: {}", cleanedResponse, e);
+                        Map<String, String> errorInfo = new HashMap<>();
+                        errorInfo.put("destino", "Error: No se pudo obtener la información del viaje");
+                        errorInfo.put("diasHastaViaje", "0");
+                        errorInfo.put("duracionViaje", "0");
+                        return errorInfo;
                     } catch (Exception e) {
                         log.error("Error al procesar la respuesta JSON", e);
                         throw new RuntimeException("Error al procesar la respuesta JSON", e);

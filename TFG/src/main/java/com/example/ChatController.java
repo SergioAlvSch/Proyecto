@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +38,8 @@ public class ChatController {
                 .onErrorResume(e -> {
                     log.error("Error al procesar el mensaje en el chat: ", e);
                     return Flux.just("Error: " + e.getMessage());
-                });
+                })
+                .doOnComplete(() -> log.info("Procesamiento de mensaje completado"));
     }
 
 }

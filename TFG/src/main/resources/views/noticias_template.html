@@ -101,6 +101,31 @@
         .submit-button:hover {
             background-color: #45a049;
         }
+        .results-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .result-box {
+            width: 48%;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-box h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -115,50 +140,49 @@
     </div>
 </header>
 <div class="content">
-<form id="peticionForm">
-    <input type="text" id="peticion" placeholder="Ingresa la URL del feed RSS" required>
-    <button type="submit" class="submit-button">Enviar</button>
-</form>
-<div id="chat-container"></div>
+    <form id="peticionForm">
+        <input type="text" id="peticion" placeholder="Ingresa la URL del feed RSS" required>
+        <button type="submit" class="submit-button">Enviar</button>
+    </form>
+    <div class="results-container">
+        <div id="original-container" class="result-box">
+            <h3>Noticias Originales</h3>
+            <pre id="original-content"></pre>
+        </div>
+        <div id="processed-container" class="result-box">
+            <h3>Noticias Procesadas</h3>
+            <pre id="processed-content"></pre>
+        </div>
+    </div>
 </div>
 <script>
     document.getElementById('peticionForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        var peticion = document.getElementById('peticion').value;
+        const peticion = document.getElementById('peticion').value;
+        const originalContent = document.getElementById('original-content');
+        const processedContent = document.getElementById('processed-content');
 
-        var submitButton = this.querySelector('button[type="submit"]');
-        submitButton.disabled = true;
-
-        addMessage(peticion, 'user-message');
-        addMessage('Procesando...', 'bot-message processing');
+        originalContent.textContent = 'Cargando noticias...';
+        processedContent.textContent = 'Procesando resúmenes...';
 
         fetch('/noticias/procesar', {
             method: 'POST',
             body: JSON.stringify({ texto: peticion }),
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Content-Type': 'application/json' }
         })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.text(); // Cambiamos a text() en lugar de usar un reader
-            })
-            .then(text => {
-                console.log("Respuesta completa:", text);
-                updateLastMessage(text.trim());
-                submitButton.disabled = false;
+            .then(response => response.json())
+            .then(data => {
+                originalContent.textContent = data.original || 'No hay datos disponibles';
+                processedContent.textContent = data.procesado || 'No hay datos procesados disponibles';
             })
             .catch(error => {
                 console.error('Error:', error);
-                updateLastMessage('Lo siento, hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.');
-                submitButton.disabled = false;
+                originalContent.textContent = 'Error al cargar noticias';
+                processedContent.textContent = 'Error al procesar noticias';
             });
 
         document.getElementById('peticion').value = '';
     });
-
     function addMessage(message, className) {
         console.log("Añadiendo mensaje:", message, "Clase:", className);
         var chatContainer = document.getElementById('chat-container');
