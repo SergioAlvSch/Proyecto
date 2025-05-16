@@ -8,10 +8,12 @@ import jakarta.inject.Singleton;
 import reactor.core.publisher.Flux;
 
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 
 @Singleton
 public class RssReaderService {
+    private List<SyndEntry> lastEntries = new ArrayList<>();
 
     public Flux<List<SyndEntry>> readRssFeed(String feedUrl) {
         return Flux.defer(() -> {
@@ -19,10 +21,15 @@ public class RssReaderService {
                 URL url = new URL(feedUrl);
                 SyndFeedInput input = new SyndFeedInput();
                 SyndFeed feed = input.build(new XmlReader(url));
-                return Flux.just(feed.getEntries());
+                lastEntries = feed.getEntries();
+                return Flux.just(lastEntries);
             } catch (Exception e) {
                 return Flux.error(e);
             }
         });
+    }
+
+    public List<SyndEntry> getLastEntries() {
+        return lastEntries;
     }
 }

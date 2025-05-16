@@ -42,46 +42,58 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      align-items: center;
-      padding: 20px;
+      align-items: stretch;
+      padding: 0;
       box-sizing: border-box;
+      height: 100%;
     }
 
     .grid-buttons {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 20px;
-      max-width: 600px;
-      width: 100%;
+      grid-template-rows: repeat(2, 1fr);
+      gap: 0;
+      width: 100vw;
+      height: 100%;
     }
 
     .grid-button {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
-      background-color: #4CAF50;
+      justify-content: center;
       color: white;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: background-color 0.3s;
+      font-size: 2em;
+      font-weight: bold;
       text-decoration: none;
+      cursor: pointer;
+      position: relative;
+      min-height: 0;
+      min-width: 0;
+      background-size: cover;
+      background-position: center;
+      transition: filter 0.3s;
+      filter: brightness(0.9);
     }
 
     .grid-button:hover {
-      background-color: #45a049;
+      filter: brightness(1.1);
     }
-
-    .grid-button img {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 10px;
-    }
-
+    .recetas { background-image: url('/images/recetas-bg.jpg'); }
+    .noticias { background-image: url('/images/noticias-bg.jpg'); }
+    .tiempo { background-image: url('/images/tiempo-bg.jpg'); }
+    .chat { background-image: url('/images/chat-bg.jpg'); }
     .grid-button span {
-      font-size: 16px;
-      text-align: center;
+      position: relative;
+      z-index: 2;
+      text-shadow: 2px 2px 4px #000;
+    }
+    .grid-button::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 1;
     }
   </style>
 </head>
@@ -93,22 +105,10 @@
 
 <div class="container">
   <div class="grid-buttons">
-    <a href="/recetas" class="grid-button">
-      <img src="" alt="Icono Recetas">
-      <span>Buscar Recetas</span>
-    </a>
-    <a href="/noticias" class="grid-button">
-      <img src="" alt="Icono Noticias">
-      <span>Leer Noticias</span>
-    </a>
-    <a href="/tiempo" class="grid-button">
-      <img src="" alt="Icono Tiempo">
-      <span>Consultar Tiempo</span>
-    </a>
-    <a href="/chat" class="grid-button">
-      <img src="" alt="Icono Chat">
-      <span>Chat con IA</span>
-    </a>
+    <a href="/recetas" class="grid-button recetas"><span>Buscar Recetas</span></a>
+    <a href="/noticias" class="grid-button noticias"><span>Leer Noticias</span></a>
+    <a href="/tiempo" class="grid-button tiempo"><span>Consultar Tiempo</span></a>
+    <a href="/chat" class="grid-button chat"><span>Chat con IA</span></a>
   </div>
 </div>
 </body>

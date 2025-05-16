@@ -15,7 +15,7 @@
             background-color: #f0f0f0;
         }
         header {
-            background-color: #4CAF50;
+            background-color: #8CCDF6;
             color: white;
             padding: 20px;
             text-align: center;
@@ -23,7 +23,7 @@
             box-sizing: border-box;
         }
         header img {
-            max-height: 50px;
+            max-height: 100px;
             vertical-align: middle;
         }
         header h1 {
@@ -33,7 +33,7 @@
             vertical-align: middle;
         }
         .content {
-            max-width: 800px;
+            max-width: 1200px;
             width: 100%;
             padding: 20px;
             box-sizing: border-box;
@@ -67,64 +67,65 @@
             border: 1px solid #ddd;
             border-radius: 5px;
         }
-        #chat-container {
-            border: 1px solid #ddd;
-            padding: 20px;
-            height: 400px;
-            overflow-y: auto;
-            width: calc(100% - 42px);
-            background-color: white;
-            border-radius: 5px;
-        }
-        .message {
-            margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .user-message {
-            background-color: #e6f3ff;
-            text-align: right;
-        }
-        .bot-message {
-            background-color: #f0f0f0;
-        }
-        .submit-button {
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-            width: 100%;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-        }
-        .submit-button:hover {
-            background-color: #45a049;
-        }
         .results-container {
             display: flex;
             justify-content: space-between;
             margin-top: 20px;
+            gap: 20px;
         }
-
         .result-box {
             width: 48%;
             border: 1px solid #ddd;
             padding: 10px;
             background-color: white;
             border-radius: 5px;
-            height: 400px;
+            min-height: 400px;
             overflow-y: auto;
         }
-
         .result-box h3 {
             margin-top: 0;
-            color: #4CAF50;
+            color: #8CCDF6;
         }
-
-        pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        .news-original-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .news-original-item {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .news-original-item:last-child {
+            border-bottom: none;
+        }
+        .processed-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .news-card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .news-image {
+            width: 100%;
+            max-height: 120px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+        .news-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .news-link {
+            margin-top: 6px;
+            font-size: 0.95em;
         }
     </style>
 </head>
@@ -147,11 +148,11 @@
     <div class="results-container">
         <div id="original-container" class="result-box">
             <h3>Noticias Originales</h3>
-            <pre id="original-content"></pre>
+            <div class="news-original-list" id="original-list"></div>
         </div>
         <div id="processed-container" class="result-box">
             <h3>Noticias Procesadas</h3>
-            <pre id="processed-content"></pre>
+            <div class="processed-grid" id="processed-grid"></div>
         </div>
     </div>
 </div>
@@ -159,52 +160,80 @@
     document.getElementById('peticionForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const peticion = document.getElementById('peticion').value;
-        const originalContent = document.getElementById('original-content');
-        const processedContent = document.getElementById('processed-content');
+        const originalList = document.getElementById('original-list');
+        const processedGrid = document.getElementById('processed-grid');
 
-        originalContent.textContent = 'Cargando noticias...';
-        processedContent.textContent = 'Procesando resúmenes...';
+        originalList.innerHTML = 'Cargando noticias...';
+        processedGrid.innerHTML = '';
 
         fetch('/noticias/procesar', {
             method: 'POST',
             body: JSON.stringify({ texto: peticion }),
             headers: { 'Content-Type': 'application/json' }
         })
-            .then(response => response.json())
-            .then(data => {
-                originalContent.textContent = data.original || 'No hay datos disponibles';
-                processedContent.textContent = data.procesado || 'No hay datos procesados disponibles';
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let originals = [];
+                function processStream({ done, value }) {
+                    if (done) {
+                        return;
+                    }
+                    buffer += decoder.decode(value, { stream: true });
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            // Render original news if not already
+                            if (originals.length === 0 && data.originals) {
+                                originals = data.originals;
+                                renderOriginals(originals);
+                            }
+                            // Render processed news card
+                            if (data.processed) {
+                                renderProcessed(data.processed);
+                            }
+                        } catch (e) {
+                            // Ignore parse errors
+                        }
+                    }
+                    return reader.read().then(processStream);
+                }
+                return reader.read().then(processStream);
             })
             .catch(error => {
-                console.error('Error:', error);
-                originalContent.textContent = 'Error al cargar noticias';
-                processedContent.textContent = 'Error al procesar noticias';
+                originalList.innerHTML = 'Error al cargar noticias';
+                processedGrid.innerHTML = 'Error al procesar noticias';
             });
 
-        document.getElementById('peticion').value = '';
-    });
-    function addMessage(message, className) {
-        console.log("Añadiendo mensaje:", message, "Clase:", className);
-        var chatContainer = document.getElementById('chat-container');
-        var messageElement = document.createElement('div');
-        messageElement.className = 'message ' + className;
-        messageElement.textContent = message;
-        chatContainer.appendChild(messageElement);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
-
-    function updateLastMessage(message) {
-        console.log("Actualizando último mensaje con:", message);
-        var chatContainer = document.getElementById('chat-container');
-        var lastMessage = chatContainer.querySelector('.processing');
-        if (lastMessage) {
-            lastMessage.innerHTML = message.replace(/\n/g, '<br>').replace(/\((https[^)]+)\)/g, '(<a href="$1" target="_blank">$1</a>)');
-            lastMessage.classList.remove('processing');
-        } else {
-            addMessage(message.replace(/\n/g, '<br>').replace(/\((https[^)]+)\)/g, '(<a href="$1" target="_blank">$1</a>)'), 'bot-message');
+        function renderOriginals(originals) {
+            originalList.innerHTML = '';
+            originals.forEach(news => {
+                originalList.innerHTML += `
+                <div class="news-original-item">
+                    <div class="news-title">${news.title}</div>
+                    <img src="${news.image}" class="news-image">
+                    <div>${news.description}</div>
+                    <div class="news-link"><a href="${news.link}" target="_blank">Leer noticia</a></div>
+                </div>
+            `;
+            });
         }
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
+
+        function renderProcessed(news) {
+            processedGrid.innerHTML += `
+            <div class="news-card">
+                <div class="news-title">${news.title}</div>
+                <img src="${news.image}" class="news-image">
+                <div>${news.summary}</div>
+                <div class="news-link"><a href="${news.link}" target="_blank">Enlace original</a></div>
+            </div>
+        `;
+        }
+    });
 </script>
 </body>
 </html>

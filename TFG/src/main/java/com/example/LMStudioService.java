@@ -29,8 +29,7 @@ public class LMStudioService {
 
     @Inject
     @Client("http://localhost:11434")
-    //@Client("http://ollama:11434") //deepseek-r1
-    //@Client("http://ollama2:11434") //llama2
+
     HttpClient httpClient;
 
     public LMStudioService(ObjectMapper objectMapper) {
@@ -43,8 +42,8 @@ public class LMStudioService {
 
         Map<String, Object> requestBody = new HashMap<>();
         //requestBody.put("model", "llama2");
-        //requestBody.put("model", "deepseek-r1");
-        requestBody.put("model", "llama3.2:3b-instruct-q8_0");
+        requestBody.put("model", "deepseek-r1:14b");
+        //requestBody.put("model", "llama3.2:3b-instruct-q8_0");
         requestBody.put("prompt", prompt);
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
@@ -184,7 +183,27 @@ public class LMStudioService {
         Matcher matcher = pattern.matcher(noticia);
         return matcher.find() ? matcher.group(1) : "";
     }
+    public Flux<String> procesarNoticiaIndividual(SyndEntry entry) {
+        String prompt = "Resume la siguiente noticia en inglés en 3 frases concisas, sin repetir el título ni añadir enlaces ni imágenes:\n" +
+                entry.getDescription().getValue();
+        return procesarTexto(prompt)
+                .map(String::trim);
+    }
 
+    // Haz el método extraerImagen público y estático para usarlo en el controller
+    public static String extraerImagen(SyndEntry entry) {
+        // Intenta extraer la imagen del contenido o usa una por defecto
+        if (entry.getEnclosures() != null && !entry.getEnclosures().isEmpty()) {
+            return entry.getEnclosures().get(0).getUrl();
+        }
+        if (entry.getDescription() != null) {
+            String desc = entry.getDescription().getValue();
+            Pattern p = Pattern.compile("<img[^>]+src=\"([^\"]+)\"");
+            Matcher m = p.matcher(desc);
+            if (m.find()) return m.group(1);
+        }
+        return "/images/default-news.jpg";
+    }
     public Flux<String> traducirNoticias(String resumenEnIngles) {
         log.info("Iniciando traducción de noticias");
         String prompt = "Translate the following news summary from English to Spanish. Keep the original formatting, including dates, links, and paragraph structure. Don't add additional information or change the tone. It literally translates:\n\n" + resumenEnIngles;
