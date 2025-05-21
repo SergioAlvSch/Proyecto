@@ -41,9 +41,10 @@ public class LMStudioService {
         log.info("Enviando prompt a Ollama: {}", prompt);
 
         Map<String, Object> requestBody = new HashMap<>();
-        //requestBody.put("model", "llama2");
-        requestBody.put("model", "deepseek-r1:14b");
+        //requestBody.put("model", "deepseek-r1:14b");
         //requestBody.put("model", "llama3.2:3b-instruct-q8_0");
+        requestBody.put("model", "gemma3:27b-it-q4_K_M");
+        //requestBody.put("model", "phi4:14b-q8_0");
         requestBody.put("prompt", prompt);
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
@@ -190,19 +191,25 @@ public class LMStudioService {
                 .map(String::trim);
     }
 
-    // Haz el método extraerImagen público y estático para usarlo en el controller
+
     public static String extraerImagen(SyndEntry entry) {
-        // Intenta extraer la imagen del contenido o usa una por defecto
         if (entry.getEnclosures() != null && !entry.getEnclosures().isEmpty()) {
             return entry.getEnclosures().get(0).getUrl();
         }
         if (entry.getDescription() != null) {
             String desc = entry.getDescription().getValue();
-            Pattern p = Pattern.compile("<img[^>]+src=\"([^\"]+)\"");
+            Pattern p = Pattern.compile("<img[^>]+src=[\"']([^\"']+)[\"']");
             Matcher m = p.matcher(desc);
             if (m.find()) return m.group(1);
         }
-        return "/images/default-news.jpg";
+        if (entry.getForeignMarkup() != null) {
+            for (org.jdom2.Element el : entry.getForeignMarkup()) {
+                if ("content".equals(el.getName()) && el.getAttribute("url") != null) {
+                    return el.getAttribute("url").getValue();
+                }
+            }
+        }
+        return "/images/Logo.png";
     }
     public Flux<String> traducirNoticias(String resumenEnIngles) {
         log.info("Iniciando traducción de noticias");

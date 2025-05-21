@@ -61,7 +61,9 @@ public class NoticiasController {
                             : Flux.empty();
                     // Procesar cada noticia individualmente
                     Flux<String> processedFlux = lmStudioService.procesarNoticiaIndividual(entry)
-                            .map(summary -> Map.of("processed", NoticiasController.toProcessedMap(entry, summary)))
+                            .flatMap(summaryEnIngles -> lmStudioService.traducirNoticias(summaryEnIngles)
+                                    .map(resumenEnEspanol -> Map.of("processed", NoticiasController.toProcessedMap(entry, resumenEnEspanol)))
+                            )
                             .map(map -> toJson(map));
                     return originalsFlux.concatWith(processedFlux);
                 });
