@@ -45,7 +45,8 @@
       align-items: stretch;
       padding: 0;
       box-sizing: border-box;
-      height: 100%;
+      height: 100vh;
+      min-height: 0;
     }
 
     .grid-buttons {
@@ -55,6 +56,7 @@
       gap: 0;
       width: 100vw;
       height: 100%;
+      min-height: 0;
     }
 
     .grid-button {
@@ -72,17 +74,22 @@
       min-width: 0;
       background-size: cover;
       background-position: center;
+      background-repeat: no-repeat;
       transition: filter 0.3s;
       filter: brightness(0.9);
     }
-
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
     .grid-button:hover {
       filter: brightness(1.1);
     }
-    .recetas { background-image: url('/images/recetas-bg.jpg'); }
-    .noticias { background-image: url('/images/noticias-bg.jpg'); }
-    .tiempo { background-image: url('/images/tiempo-bg.jpg'); }
-    .chat { background-image: url('/images/chat-bg.jpg'); }
+    .recetas { background-image: url('/images/recetas-bg.png'); }
+    .noticias { background-image: url('/images/noticias-bg.png'); }
+    .tiempo { background-image: url('/images/tiempo-bg.png'); }
+    .chat { background-image: url('/images/chat-bg.png'); }
     .grid-button span {
       position: relative;
       z-index: 2;
@@ -100,7 +107,7 @@
 <body>
 <header>
   <img src="/images/Logo.png" alt="Logo de la Aplicación">
-  <h1>Nombre de la Aplicación</h1>
+  <h1>LIAN</h1>
 </header>
 
 <div class="container">

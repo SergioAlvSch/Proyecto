@@ -185,7 +185,7 @@ public class LMStudioService {
         return matcher.find() ? matcher.group(1) : "";
     }
     public Flux<String> procesarNoticiaIndividual(SyndEntry entry) {
-        String prompt = "Resume la siguiente noticia en inglés en 3 frases concisas, sin repetir el título ni añadir enlaces ni imágenes:\n" +
+        String prompt = "Resume la siguiente noticia en inglés en un minimo de 3 y un maximo de 10 frases concisas, sin repetir el título ni añadir enlaces ni imágenes:\n" +
                 entry.getDescription().getValue();
         return procesarTexto(prompt)
                 .map(String::trim);
@@ -213,7 +213,7 @@ public class LMStudioService {
     }
     public Flux<String> traducirNoticias(String resumenEnIngles) {
         log.info("Iniciando traducción de noticias");
-        String prompt = "Translate the following news summary from English to Spanish. Keep the original formatting, including dates, links, and paragraph structure. Don't add additional information or change the tone. It literally translates:\n\n" + resumenEnIngles;
+        String prompt = "Translate the following news summary from English to Spanish. Don't add additional information or change the tone. It literally translates:\n\n" + resumenEnIngles;
 
         return procesarTexto(prompt)
                 .timeout(Duration.ofSeconds(600))

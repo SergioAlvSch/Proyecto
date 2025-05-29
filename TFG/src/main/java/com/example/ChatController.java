@@ -41,5 +41,4 @@ public class ChatController {
                 })
                 .doOnComplete(() -> log.info("Procesamiento de mensaje completado"));
     }
-
 }
