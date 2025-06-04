@@ -8,7 +8,6 @@ import jakarta.inject.Singleton;
 import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

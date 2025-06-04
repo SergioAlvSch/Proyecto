@@ -1,6 +1,5 @@
 package com.example;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.rometools.rome.feed.synd.SyndEntry;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
@@ -10,13 +9,7 @@ import jakarta.inject.Inject;
 import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.scheduler.Schedulers;
-
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 

@@ -41,9 +41,9 @@ public class LMStudioService {
         log.info("Enviando prompt a Ollama: {}", prompt);
 
         Map<String, Object> requestBody = new HashMap<>();
-        //requestBody.put("model", "deepseek-r1:14b");
+        requestBody.put("model", "deepseek-r1:14b");
         //requestBody.put("model", "llama3.2:3b-instruct-q8_0");
-        requestBody.put("model", "gemma3:27b-it-q4_K_M");
+        //requestBody.put("model", "gemma3:27b-it-q4_K_M");
         //requestBody.put("model", "phi4:14b-q8_0");
         requestBody.put("prompt", prompt);
 
@@ -138,59 +138,12 @@ public class LMStudioService {
         return procesarTexto(prompt);
     }
 
-    public Flux<String> procesarNoticias(List<SyndEntry> noticias) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
-        String prompt = "Summarize these specific news articles in English, maintaining their original content and source. Include the date at the beginning and the link at the end of each summary:\n\n" +
-                noticias.stream().limit(5).map(entry -> {
-                    String date = dateFormat.format(entry.getPublishedDate());
-                    String title = entry.getTitle();
-                    String description = entry.getDescription().getValue();
-                    String link = entry.getLink();
-                    return String.format("[%s] %s: %s (%s)", date, title, description, link);
-                }).collect(Collectors.joining("\n\n")) +
-                "\n\nProvide a summary for each news item, keeping the date at the beginning and the link at the end in parentheses.";
-
-        log.info("Enviando prompt a Ollama para procesar noticias");
-        return procesarTexto(prompt)
-                .timeout(Duration.ofSeconds(600))
-                .map(this::formatearRespuestaNoticias)
-                .doOnNext(response -> log.info("Respuesta formateada de Ollama para noticias: {}", response))
-                .doOnError(e -> log.error("Error al procesar noticias con Ollama", e))
-                .onErrorResume(e -> Flux.just("Error al procesar noticias: " + e.getMessage()));
-    }
-
-    private String formatearRespuestaNoticias(String respuesta) {
-        String[] noticias = respuesta.split("\n\n");
-        StringBuilder resultado = new StringBuilder();
-        for (String noticia : noticias) {
-            String fechaFormateada = extraerFecha(noticia);
-            String enlaceFormateado = extraerEnlace(noticia);
-            String contenido = noticia.replaceAll("\\[.*?\\]", "").replaceAll("\\(http.*?\\)", "").trim();
-            resultado.append(fechaFormateada).append("\n")
-                    .append(contenido).append("\n")
-                    .append(enlaceFormateado).append("\n\n");
-        }
-        return resultado.toString().trim();
-    }
-
-    private String extraerFecha(String noticia) {
-        Pattern pattern = Pattern.compile("\\[(\\d{2}/\\d{2}/\\d{4})\\]");
-        Matcher matcher = pattern.matcher(noticia);
-        return matcher.find() ? matcher.group(1) : "";
-    }
-
-    private String extraerEnlace(String noticia) {
-        Pattern pattern = Pattern.compile("\\((https.*?)\\)");
-        Matcher matcher = pattern.matcher(noticia);
-        return matcher.find() ? matcher.group(1) : "";
-    }
     public Flux<String> procesarNoticiaIndividual(SyndEntry entry) {
-        String prompt = "Resume la siguiente noticia en inglés en un minimo de 3 y un maximo de 10 frases concisas, sin repetir el título ni añadir enlaces ni imágenes:\n" +
+        String prompt = "Resume la siguiente noticia en inglés en un minimo de 3 y un maximo de 10 frases concisas eliminando los sesgos que puedan existir, sin repetir el título ni añadir enlaces ni imágenes:\n" +
                 entry.getDescription().getValue();
         return procesarTexto(prompt)
                 .map(String::trim);
     }
-
 
     public static String extraerImagen(SyndEntry entry) {
         if (entry.getEnclosures() != null && !entry.getEnclosures().isEmpty()) {
@@ -211,6 +164,7 @@ public class LMStudioService {
         }
         return "/images/Logo.png";
     }
+
     public Flux<String> traducirNoticias(String resumenEnIngles) {
         log.info("Iniciando traducción de noticias");
         String prompt = "Translate the following news summary from English to Spanish. Don't add additional information or change the tone. It literally translates:\n\n" + resumenEnIngles;
@@ -246,8 +200,17 @@ public class LMStudioService {
 
         return procesarTexto(prompt)
                 .map(respuesta -> {
-                    // Limpieza estricta de la respuesta
-                    String cleanedResponse = respuesta.replaceAll("[^\\{\\}\"':,\\d\\w\\s]", "").trim();
+                    // 1. Elimina comentarios /* ... */
+                    String cleanedResponse = respuesta.replaceAll("/\\*.*?\\*/", "");
+                    // 2. Elimina lo que no sea el JSON principal: busca el primer { y el último }
+                    int primerLlave = cleanedResponse.indexOf('{');
+                    int ultimaLlave = cleanedResponse.lastIndexOf('}');
+                    if (primerLlave >= 0 && ultimaLlave > primerLlave) {
+                        cleanedResponse = cleanedResponse.substring(primerLlave, ultimaLlave + 1).trim();
+                    }
+                    // 3. Elimina espacios, saltos de línea y otros caracteres extraños al inicio y final
+                    cleanedResponse = cleanedResponse.replaceAll("^[\\s\\u00A0\\u2000-\\u200F\\u2028-\\u202F]+|[\\s\\u00A0\\u2000-\\u200F\\u2028-\\u202F]+$", "");
+                    log.info("Respuesta limpiada: {}", cleanedResponse);
                     try {
                         // Intenta parsear la respuesta como JSON
                         Map<String, String> info = objectMapper.readValue(cleanedResponse,

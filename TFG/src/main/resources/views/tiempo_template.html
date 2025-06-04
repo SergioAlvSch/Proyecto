@@ -91,6 +91,21 @@
       word-wrap: break-word;
       text-align: left;
     }
+    .message strong {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .message em {
+      font-style: italic;
+      color: #2c3e50;
+    }
+
+    .message br {
+      display: block;
+      content: "";
+      margin: 0.5em 0;
+    }
     .submit-button {
       padding: 10px 20px;
       background-color: #8CCDF6;
@@ -180,7 +195,9 @@
             .then(response => response.json())
             .then(data => {
               pronosticoContent.textContent = JSON.stringify(data.pronostico, null, 2) || 'No hay datos disponibles';
-              consejoContent.textContent = data.consejo || 'No hay recomendaciones disponibles';
+              // Aplica el formateo al consejo
+              const consejoFormateado = formatearRespuesta(data.consejo || 'No hay recomendaciones disponibles');
+              consejoContent.innerHTML = consejoFormateado; // Usa innerHTML para que se interpreten las etiquetas
             })
             .catch(error => {
               console.error('Error:', error);
@@ -190,39 +207,25 @@
 
     document.getElementById('peticion').value = '';
   });
-
-  function addMessage(message, className) {
-    console.log("Añadiendo mensaje:", message, "Clase:", className);
-    var chatContainer = document.getElementById('chat-container');
-    var messageElement = document.createElement('div');
-    messageElement.className = 'message ' + className;
-    messageElement.textContent = message;
-    chatContainer.appendChild(messageElement);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  }
-
-  function updateLastMessage(message) {
-    console.log("Actualizando último mensaje con:", message);
-    var chatContainer = document.getElementById('chat-container');
-    var lastMessage = chatContainer.lastElementChild;
-
-    // Reemplazar saltos de línea con <br>
-    message = message.replace(/\n/g, '<br>');
-
-    if (lastMessage && lastMessage.classList.contains('processing')) {
-      if (message === "Procesando petición..." || message === "Obteniendo pronóstico..." || message === "Traduciendo respuesta...") {
-        lastMessage.textContent = message;
-      } else {
-        lastMessage.innerHTML = message; // Usar innerHTML en lugar de textContent
-        lastMessage.classList.remove('processing');
-      }
-    } else {
-      var messageElement = document.createElement('div');
-      messageElement.className = 'message ' + (message === "Procesando petición..." || message === "Obteniendo pronóstico..." || message === "Traduciendo respuesta..." ? 'bot-message processing' : 'bot-message');
-      messageElement.innerHTML = message; // Usar innerHTML
-      chatContainer.appendChild(messageElement);
+  function formatearRespuesta(texto) {
+    texto = texto.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Convertir encabezados markdown (### Encabezado)
+    texto = texto.replace(/^#{1,6}\s+(.*$)/gm, '<h3>$1</h3>');
+    // Convertir listas numeradas (1. Item)
+    texto = texto.replace(/^\d+\.\s+(.*$)/gm, '<li>$1</li>');
+    // Si hay al menos un <li>, envolver en <ol>
+    if (texto.includes('<li>')) {
+      texto = texto.replace(/(<li>.*?<\/li>(?:\n|$))+/g, function(match) {
+        return '<ol>' + match.replace(/\n/g, '') + '</ol>';
+      });
     }
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    // Convertir negritas (**texto**)
+    texto = texto.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Convertir cursivas (*texto*)
+    texto = texto.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Convertir saltos de línea
+    texto = texto.replace(/\n/g, '<br>');
+    return texto;
   }
 </script>
 </body>

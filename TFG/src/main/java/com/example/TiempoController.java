@@ -9,9 +9,7 @@ import jakarta.inject.Inject;
 import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,7 +52,10 @@ public class TiempoController {
                                             ((Number) pronostico.get("diasPronosticados")).intValue(),
                                             diasTotales,
                                             infoViaje.get("destino"))
-                                    .map(consejo -> crearJsonCompleto(pronostico, consejo)));
+                                    .flatMap(consejoEnIngles -> lmStudioService.traducirRespuesta(consejoEnIngles)
+                                            .map(consejoEnEspanol -> crearJsonCompleto(pronostico, consejoEnEspanol))
+                                    )
+                            );
                 })
                 .onErrorResume(e -> Flux.just(crearJson("error", "Error: " + e.getMessage())));
     }
@@ -86,15 +87,3 @@ public class TiempoController {
         }
     }
 }
-    /*private String crearRespuestaError(String textoOriginal, Throwable e) {
-        Map<String, String> error = new HashMap<>();
-        error.put("error", e.getMessage());
-        try {
-            return objectMapper.writeValueAsString(error);
-        } catch (JsonProcessingException jpe) {
-            log.error("Error al serializar respuesta de error", jpe);
-            return "{\"error\": \"Error interno del servidor\"}";
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-    }*/

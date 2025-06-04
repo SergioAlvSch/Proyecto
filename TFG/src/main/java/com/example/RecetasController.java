@@ -9,15 +9,13 @@ import jakarta.inject.Inject;
 import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
-import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
 
 @Controller("/recetas")
 public class RecetasController {
@@ -85,22 +83,45 @@ public class RecetasController {
 
     private Flux<String> realizarPeticionSpoonacular(String tipo, String parametros) {
         String baseUrl = "https://api.spoonacular.com/recipes/complexSearch";
-        String apiKey = "6b914274211f42b281b0242d60afac98";
+        String apiKey = "6b914274211f42b281b0242d60afac98"; // ¡Cambia por tu clave!
         String url = baseUrl + "?" + (tipo.equals("ingredientes") ? "includeIngredients=" : "query=")
                 + URLEncoder.encode(parametros, StandardCharsets.UTF_8) + "&apiKey=" + apiKey;
 
         String tipoFinal = tipo.equals("ingredientes") ? "1" : "2";
 
         return spoonacularService.realizarPeticionPersonalizada(url)
-                .flatMap(respuestaSpoonacular ->
-                        lmStudioService.generarRespuestaRecetas(tipoFinal, respuestaSpoonacular)
-                                .flatMap(respuestaEnIngles ->
-                                        lmStudioService.traducirRespuesta(respuestaEnIngles)
-                                                .flatMap(this::emitirRespuesta)
-                                )
-                );
-    }
+                .flatMap(respuestaSpoonacular -> {
+                    List<Map<String, String>> recetas = (List<Map<String, String>>) respuestaSpoonacular.get("recetas");
+                    String rawData = (String) respuestaSpoonacular.get("raw");
 
+                    return lmStudioService.generarRespuestaRecetas(tipoFinal, rawData)
+                            .flatMap(respuestaEnIngles ->
+                                    lmStudioService.traducirRespuesta(respuestaEnIngles)
+                                            .map(traduccion -> crearRespuestaConImagenes(traduccion, recetas))
+                            );
+                });
+    }
+    private String crearRespuestaConImagenes(String texto, List<Map<String, String>> recetas) {
+        try {
+            log.info("Estoy en el metodo crearRespuestaConImagen");
+            Map<String, Object> respuesta = new HashMap<>();
+            respuesta.put("respuesta", texto);
+            respuesta.put("imagenes", recetas.stream()
+                    .map(r -> Map.of(
+                            "titulo", r.get("titulo"),
+                            "imagen", r.get("imagen"),
+                            "enlace", r.get("enlace")
+                    ))
+                    .collect(Collectors.toList()));
+            log.info("Termino con el metodo crearRespuestaConImagen");
+            log.info("Respuesta final con imágenes: {}", objectMapper.writeValueAsString(respuesta));
+            return objectMapper.writeValueAsString(respuesta);
+        } catch (JsonProcessingException e) {
+            return "{\"error\": \"Error al formatear respuesta\"}";
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
     private Flux<String> emitirRespuesta(String mensaje) {
         Map<String, String> respuesta = new HashMap<>();
         respuesta.put("respuesta", mensaje);

@@ -6,7 +6,6 @@ import com.rometools.rome.io.SyndFeedInput;
 import com.rometools.rome.io.XmlReader;
 import jakarta.inject.Singleton;
 import reactor.core.publisher.Flux;
-
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;

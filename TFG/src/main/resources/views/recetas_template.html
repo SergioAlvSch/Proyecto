@@ -88,6 +88,21 @@
     .bot-message {
       background-color: #f0f0f0;
     }
+    .message strong {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .message em {
+      font-style: italic;
+      color: #2c3e50;
+    }
+
+    .message br {
+      display: block;
+      content: "";
+      margin: 0.5em 0;
+    }
     .submit-button {
       padding: 10px 20px;
       background-color: #8CCDF6;
@@ -178,18 +193,55 @@
     document.getElementById('peticion').value = '';
   });
 
-    function processChunk(chunk) {
-      try {
-        const data = JSON.parse(chunk);
-        console.log("Datos recibidos:", data);
-        if (data.respuesta && data.respuesta !== "Procesando petición...") {
-          updateLastMessage(data.respuesta);
+  function processChunk(chunk) {
+    try {
+      const data = JSON.parse(chunk);
+      console.log("Datos recibidos:", data);
+      if (data.respuesta && data.respuesta !== "Procesando petición...") {
+        let html = formatearRespuesta(data.respuesta);
+        if (data.imagenes && data.imagenes.length > 0) {
+          html += '<div style="margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">';
+          data.imagenes.forEach(receta => {
+            html += `
+                    <div style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: white;">
+                        <h4>${receta.titulo || 'Receta'}</h4>
+                        <img src="${receta.imagen}" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 8px;">
+                        <a href="${receta.enlace}" target="_blank" style="display: inline-block; padding: 6px 12px; background: #8CCDF6; color: white; border-radius: 4px; text-decoration: none;">Ver receta</a>
+                    </div>
+                    `;
+          });
+          html += '</div>';
         }
-      } catch (error) {
-        console.error('Error parsing JSON:', error, 'Content:', chunk);
+        updateLastMessage(html, true); // true para indicar que es HTML
       }
+    } catch (error) {
+      console.error('Error parsing JSON:', error, 'Content:', chunk);
+    }
+  }
+  function formatearRespuesta(texto) {
+    texto = texto.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Convertir encabezados markdown (### Encabezado)
+    texto = texto.replace(/^#{1,6}\s+(.*$)/gm, '<h3>$1</h3>');
+
+    // Convertir listas numeradas (1. Item)
+    texto = texto.replace(/^\d+\.\s+(.*$)/gm, '<li>$1</li>');
+    // Si hay al menos un <li>, envolver en <ol>
+    if (texto.includes('<li>')) {
+      texto = texto.replace(/(<li>.*?<\/li>(?:\n|$))+/g, function(match) {
+        return '<ol>' + match.replace(/\n/g, '') + '</ol>';
+      });
     }
 
+    // Convertir negritas (**texto**)
+    texto = texto.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Convertir cursivas (*texto*)
+    texto = texto.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Convertir saltos de línea
+    texto = texto.replace(/\n/g, '<br>');
+
+    return texto;
+  }
   function addMessage(message, className) {
     console.log("Añadiendo mensaje:", message, "Clase:", className);
     var chatContainer = document.getElementById('chat-container');
@@ -200,20 +252,25 @@
     chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
-  function updateLastMessage(message) {
-    console.log("Actualizando último mensaje con:", message);
+  function updateLastMessage(message, isHtml = false) {
     var chatContainer = document.getElementById('chat-container');
-    var lastMessage = chatContainer.lastElementChild;
-    if (lastMessage && lastMessage.classList.contains('processing')) {
-      lastMessage.textContent = message;
+    var lastMessage = chatContainer.querySelector('.processing');
+    if (lastMessage) {
+      if (isHtml) {
+        lastMessage.innerHTML = message;
+      } else {
+        lastMessage.textContent = message;
+      }
       lastMessage.classList.remove('processing');
     } else {
-      // Eliminar el mensaje "Procesando..." si existe
-      var processingMessage = chatContainer.querySelector('.processing');
-      if (processingMessage) {
-        chatContainer.removeChild(processingMessage);
+      var messageElement = document.createElement('div');
+      messageElement.className = 'message bot-message';
+      if (isHtml) {
+        messageElement.innerHTML = message;
+      } else {
+        messageElement.textContent = message;
       }
-      addMessage(message, 'bot-message');
+      chatContainer.appendChild(messageElement);
     }
     chatContainer.scrollTop = chatContainer.scrollHeight;
   }
