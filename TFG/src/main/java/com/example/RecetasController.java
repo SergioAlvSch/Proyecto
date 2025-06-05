@@ -103,7 +103,6 @@ public class RecetasController {
     }
     private String crearRespuestaConImagenes(String texto, List<Map<String, String>> recetas) {
         try {
-            log.info("Estoy en el metodo crearRespuestaConImagen");
             Map<String, Object> respuesta = new HashMap<>();
             respuesta.put("respuesta", texto);
             respuesta.put("imagenes", recetas.stream()
@@ -113,7 +112,6 @@ public class RecetasController {
                             "enlace", r.get("enlace")
                     ))
                     .collect(Collectors.toList()));
-            log.info("Termino con el metodo crearRespuestaConImagen");
             log.info("Respuesta final con imágenes: {}", objectMapper.writeValueAsString(respuesta));
             return objectMapper.writeValueAsString(respuesta);
         } catch (JsonProcessingException e) {
@@ -147,5 +145,14 @@ public class RecetasController {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    @Post("/detalle")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_EVENT_STREAM)
+    public Flux<String> obtenerDetalleReceta(@Body Map<String, String> peticion) {
+        String nombreReceta = peticion.get("texto");
+        log.info("Buscando detalles de receta: {}", nombreReceta);
+        return realizarPeticionSpoonacular("receta_especifica", nombreReceta);
     }
 }

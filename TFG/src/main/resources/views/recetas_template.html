@@ -202,21 +202,52 @@
         if (data.imagenes && data.imagenes.length > 0) {
           html += '<div style="margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">';
           data.imagenes.forEach(receta => {
+            const titulo = receta.titulo.replace(/'/g, "\\'");
             html += `
-                    <div style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: white;">
-                        <h4>${receta.titulo || 'Receta'}</h4>
-                        <img src="${receta.imagen}" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 8px;">
-                        <a href="${receta.enlace}" target="_blank" style="display: inline-block; padding: 6px 12px; background: #8CCDF6; color: white; border-radius: 4px; text-decoration: none;">Ver receta</a>
-                    </div>
-                    `;
+            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: white;">
+              <h4>${receta.titulo || 'Receta'}</h4>
+              <img src="${receta.imagen}" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 8px;">
+              <button onclick="buscarReceta('${titulo}')"
+                      style="display: inline-block; padding: 6px 12px; background: #8CCDF6; color: white; border-radius: 4px; text-decoration: none; border: none; cursor: pointer;">
+                Ver receta completa
+              </button>
+            </div>
+          `;
           });
           html += '</div>';
         }
-        updateLastMessage(html, true); // true para indicar que es HTML
+        updateLastMessage(html, true);
       }
     } catch (error) {
       console.error('Error parsing JSON:', error, 'Content:', chunk);
     }
+  }
+
+  function buscarReceta(nombreReceta) {
+    addMessage(nombreReceta, 'user-message');
+    addMessage('Buscando detalles de la receta...', 'bot-message processing');
+
+    fetch('/recetas/detalle', {
+      method: 'POST',
+      body: JSON.stringify({ texto: nombreReceta }),
+      headers: { 'Content-Type': 'application/json' }
+    })
+            .then(response => {
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+              function readChunk() {
+                return reader.read().then(({ done, value }) => {
+                  if (done) return;
+                  const chunk = decoder.decode(value, { stream: true });
+                  processChunk(chunk);
+                  return readChunk();
+                });
+              }
+              return readChunk();
+            })
+            .catch(error => {
+              updateLastMessage('Error al cargar detalles de la receta');
+            });
   }
   function formatearRespuesta(texto) {
     texto = texto.replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -274,6 +305,7 @@
     }
     chatContainer.scrollTop = chatContainer.scrollHeight;
   }
+
 </script>
 </body>
 </html>

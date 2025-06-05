@@ -149,19 +149,23 @@ public class LMStudioService {
         if (entry.getEnclosures() != null && !entry.getEnclosures().isEmpty()) {
             return entry.getEnclosures().get(0).getUrl();
         }
+
         if (entry.getDescription() != null) {
             String desc = entry.getDescription().getValue();
             Pattern p = Pattern.compile("<img[^>]+src=[\"']([^\"']+)[\"']");
             Matcher m = p.matcher(desc);
             if (m.find()) return m.group(1);
         }
+
         if (entry.getForeignMarkup() != null) {
             for (org.jdom2.Element el : entry.getForeignMarkup()) {
-                if ("content".equals(el.getName()) && el.getAttribute("url") != null) {
+                String localName = el.getName().toLowerCase();
+                if ((localName.equals("content") || localName.equals("thumbnail")) && el.getAttribute("url") != null) {
                     return el.getAttribute("url").getValue();
                 }
             }
         }
+
         return "/images/Logo.png";
     }
 
