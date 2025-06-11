@@ -40,6 +40,7 @@ public class RecetasController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_EVENT_STREAM)
     public Flux<String> procesarPeticionReceta(@Body Map<String, String> peticion) {
+        long startTime = System.currentTimeMillis();
         String texto = peticion.get("texto");
         log.info("Recibida solicitud de receta: {}", texto);
         return Flux.concat(
@@ -55,6 +56,10 @@ public class RecetasController {
         ).onErrorResume(e -> {
             log.error("Error al procesar la petición de receta: ", e);
             return Flux.just(crearRespuestaError(texto, e));
+        }).doOnComplete(() -> {
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+            log.info("Tiempo total de procesamiento de la petición: {} ms (modelo: {})", duration, lmStudioService.getModeloActual());
         });
     }
 

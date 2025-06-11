@@ -35,6 +35,7 @@ public class NoticiasController {
     @Post("/procesar")
     @Produces(MediaType.TEXT_EVENT_STREAM)
     public Flux<String> obtenerNoticias(@Body Map<String, String> peticion) {
+        long startTime = System.currentTimeMillis();
         String feedUrl = peticion.get("texto");
         log.info("Recibida solicitud de noticias para URL: {}", feedUrl);
 
@@ -59,6 +60,10 @@ public class NoticiasController {
                             )
                             .map(map -> toJson(map));
                     return originalsFlux.concatWith(processedFlux);
+                }).doOnComplete(() -> {
+                    long endTime = System.currentTimeMillis();
+                    long duration = endTime - startTime;
+                    log.info("Tiempo total de procesamiento de la petición: {} ms (modelo: {})", duration, lmStudioService.getModeloActual());
                 });
     }
 

@@ -26,6 +26,7 @@ public class LMStudioService {
     private static final Logger log = LoggerFactory.getLogger(LMStudioService.class);
     private final ObjectMapper objectMapper;
     private final Runtime runtime;
+    private String modeloActual;
 
     @Inject
     @Client("http://localhost:11434")
@@ -35,16 +36,18 @@ public class LMStudioService {
     public LMStudioService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         this.runtime = Runtime.getRuntime();
+        this.modeloActual = "gemma3";
     }
-
+    public String getModeloActual() {
+        return modeloActual;
+    }
     public Flux<String> procesarTexto(String prompt) {
         log.info("Enviando prompt a Ollama: {}", prompt);
 
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "deepseek-r1:14b");
-        //requestBody.put("model", "llama3.2:3b-instruct-q8_0");
-        //requestBody.put("model", "gemma3:27b-it-q4_K_M");
-        //requestBody.put("model", "phi4:14b-q8_0");
+        //requestBody.put("model", "deepseek-r1:14b");
+        //requestBody.put("model", "llama3.3:70b-instruct-q4_K_M");
+        requestBody.put("model", "gemma3:27b-it-q8_0");
         requestBody.put("prompt", prompt);
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);

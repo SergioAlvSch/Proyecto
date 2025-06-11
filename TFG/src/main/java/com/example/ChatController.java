@@ -28,6 +28,7 @@ public class ChatController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_EVENT_STREAM)
     public Flux<String> procesarMensaje(@Body Map<String, String> peticion) {
+        long startTime = System.currentTimeMillis();
         String mensaje = peticion.get("texto");
         log.info("Recibida solicitud de chat: {}", mensaje);
         return lmStudioService.procesarTexto(mensaje)
@@ -36,6 +37,10 @@ public class ChatController {
                     log.error("Error al procesar el mensaje en el chat: ", e);
                     return Flux.just("Error: " + e.getMessage());
                 })
-                .doOnComplete(() -> log.info("Procesamiento de mensaje completado"));
+                .doOnComplete(() -> {
+                    long endTime = System.currentTimeMillis();
+                    long duration = endTime - startTime;
+                    log.info("Tiempo total de procesamiento de la petición: {} ms (modelo: {})", duration, lmStudioService.getModeloActual());
+                });
     }
 }

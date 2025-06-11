@@ -36,6 +36,7 @@ public class TiempoController {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_EVENT_STREAM)
     public Flux<String> procesarConsultaTiempo(@Body Map<String, String> peticion) {
+        long startTime = System.currentTimeMillis();
         String texto = peticion.get("texto");
         log.info("Recibida solicitud de tiempo: {}", texto);
 
@@ -57,7 +58,11 @@ public class TiempoController {
                                     )
                             );
                 })
-                .onErrorResume(e -> Flux.just(crearJson("error", "Error: " + e.getMessage())));
+                .onErrorResume(e -> Flux.just(crearJson("error", "Error: " + e.getMessage()))).doOnComplete(() -> {
+                    long endTime = System.currentTimeMillis();
+                    long duration = endTime - startTime;
+                    log.info("Tiempo total de procesamiento de la petición: {} ms (modelo: {})", duration, lmStudioService.getModeloActual());
+                });
     }
 
     private String crearJsonCompleto(Object pronostico, String consejo) {
