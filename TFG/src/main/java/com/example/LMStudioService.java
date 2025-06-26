@@ -36,7 +36,7 @@ public class LMStudioService {
     public LMStudioService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         this.runtime = Runtime.getRuntime();
-        this.modeloActual = "gemma3";
+        this.modeloActual = "DeepSeek";
     }
     public String getModeloActual() {
         return modeloActual;
@@ -45,9 +45,9 @@ public class LMStudioService {
         log.info("Enviando prompt a Ollama: {}", prompt);
 
         Map<String, Object> requestBody = new HashMap<>();
-        //requestBody.put("model", "deepseek-r1:14b");
+        requestBody.put("model", "deepseek-r1:14b");
         //requestBody.put("model", "llama3.3:70b-instruct-q4_K_M");
-        requestBody.put("model", "gemma3:27b-it-q8_0");
+        //requestBody.put("model", "gemma3:27b-it-q8_0");
         requestBody.put("prompt", prompt);
 
         HttpRequest<?> request = HttpRequest.POST("/api/generate", requestBody);
@@ -114,7 +114,8 @@ public class LMStudioService {
     }
 
     public Flux<List<String>> extraerIngredientes(String consultaTraducida) {
-        String prompt = "Extrae los ingredientes mencionados en la siguiente consulta: '" + consultaTraducida + "'. Responde con una lista de ingredientes separados por comas.";
+        String prompt = "Extrae los ingredientes mencionados en la siguiente consulta: '" + consultaTraducida +
+                "'. Responde con una lista de ingredientes separados por comas.";
         return procesarTexto(prompt)
                 .map(respuesta -> {
                     String[] partes = respuesta.split(":");
@@ -127,22 +128,26 @@ public class LMStudioService {
     }
 
     public Flux<String> extraerNombreReceta(String consultaTraducida) {
-        String prompt = "Extrae el nombre de la receta mencionada en la siguiente consulta: '" + consultaTraducida + "'. Responde SOLO con el nombre de la receta.";
+        String prompt = "Extrae el nombre de la receta mencionada en la siguiente consulta: '"
+                + consultaTraducida + "'. Responde SOLO con el nombre de la receta.";
         return procesarTexto(prompt).map(String::trim);
     }
 
     public Flux<String> generarRespuestaRecetas(String tipo, String respuestaSpoonacular) {
         String prompt;
         if ("1".equals(tipo)) {
-            prompt = "Genera una respuesta amigable en inglés listando los nombres de las recetas que se pueden hacer con estos ingredientes: " + respuestaSpoonacular;
+            prompt = "Genera una respuesta amigable en inglés listando los nombres de las recetas que se pueden hacer " +
+                    "con estos ingredientes: " + respuestaSpoonacular;
         } else {
-            prompt = "Genera una respuesta amigable en inglés con los detalles y la preparación de esta receta específica: " + respuestaSpoonacular;
+            prompt = "Genera una respuesta amigable en inglés con los detalles y la preparación de esta receta específica: "
+                    + respuestaSpoonacular;
         }
         return procesarTexto(prompt);
     }
 
     public Flux<String> procesarNoticiaIndividual(SyndEntry entry) {
-        String prompt = "Resume la siguiente noticia en inglés en un minimo de 3 y un maximo de 10 frases concisas eliminando los sesgos que puedan existir, sin repetir el título ni añadir enlaces ni imágenes:\n" +
+        String prompt = "Resume la siguiente noticia en inglés en un minimo de 3 y un maximo de 10 frases concisas " +
+                "eliminando los sesgos que puedan existir, sin repetir el título ni añadir enlaces ni imágenes:\n" +
                 entry.getDescription().getValue();
         return procesarTexto(prompt)
                 .map(String::trim);
@@ -174,7 +179,8 @@ public class LMStudioService {
 
     public Flux<String> traducirNoticias(String resumenEnIngles) {
         log.info("Iniciando traducción de noticias");
-        String prompt = "Translate the following news summary from English to Spanish. Don't add additional information or change the tone. It literally translates:\n\n" + resumenEnIngles;
+        String prompt = "Translate the following news summary from English to Spanish. Don't add additional information or " +
+                "change the tone. It literally translates:\n\n" + resumenEnIngles;
 
         return procesarTexto(prompt)
                 .timeout(Duration.ofSeconds(600))
@@ -185,7 +191,8 @@ public class LMStudioService {
 
     public Flux<String> traducirRespuesta(String respuestaEnIngles) {
         log.info("Iniciando traducción de respuesta");
-        String prompt = "Traduce la siguiente respuesta al español, manteniendo un tono amigable y conversacional: '" + respuestaEnIngles + "'";
+        String prompt = "Traduce la siguiente respuesta al español, manteniendo un tono amigable y conversacional: '"
+                + respuestaEnIngles + "'";
         return procesarTexto(prompt)
                 .timeout(Duration.ofSeconds(600))
                 .doOnNext(traduccion -> log.info("Traducción completada: {}", traduccion))

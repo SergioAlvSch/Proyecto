@@ -88,7 +88,7 @@ public class RecetasController {
 
     private Flux<String> realizarPeticionSpoonacular(String tipo, String parametros) {
         String baseUrl = "https://api.spoonacular.com/recipes/complexSearch";
-        String apiKey = "6b914274211f42b281b0242d60afac98"; // ¡Cambia por tu clave!
+        String apiKey = "6b914274211f42b281b0242d60afac98";
         String url = baseUrl + "?" + (tipo.equals("ingredientes") ? "includeIngredients=" : "query=")
                 + URLEncoder.encode(parametros, StandardCharsets.UTF_8) + "&apiKey=" + apiKey;
 
